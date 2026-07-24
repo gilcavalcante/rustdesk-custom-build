@@ -137,7 +137,7 @@ jobs:
       - name: Setup VCPKG & Dependencies
         shell: pwsh
         run: |
-          vcpkg install opus:x64-windows-static pkgconf:x64-windows-static
+          vcpkg install --classic opus:x64-windows-static pkgconf:x64-windows-static
 
       - name: Build RustDesk Portable
         shell: pwsh
@@ -154,4 +154,4 @@ jobs:
         with:
           tag_name: "v1.0.0-build"
           files: dist/Sunev-Windows-64bits.exe
-# Setup VCPKG and Opus library for Windows build
+# Use --classic mode for vcpkg install on Windows
