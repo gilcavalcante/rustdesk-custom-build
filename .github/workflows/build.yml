@@ -134,8 +134,16 @@ jobs:
         with:
           flutter-version: "3.24.5"
 
+      - name: Setup VCPKG & Dependencies
+        shell: pwsh
+        run: |
+          vcpkg install opus:x64-windows-static pkgconf:x64-windows-static
+
       - name: Build RustDesk Portable
         shell: pwsh
+        env:
+          VCPKG_ROOT: "C:/vcpkg"
+          VCPKG_DEFAULT_TRIPLET: "x64-windows-static"
         run: |
           python3 .\build.py --portable --flutter --skip-portable-pack
           mkdir dist
@@ -146,4 +154,4 @@ jobs:
         with:
           tag_name: "v1.0.0-build"
           files: dist/Sunev-Windows-64bits.exe
-# Fix write permissions for release and windows rustfmt/hwcodec
+# Setup VCPKG and Opus library for Windows build
