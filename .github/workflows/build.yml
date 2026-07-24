@@ -136,3 +136,4 @@ jobs:
         with:
           tag_name: "v1.0.0-build"
           files: dist/Sunev-Windows-64bits.exe
+# Force triggering GitHub Actions
