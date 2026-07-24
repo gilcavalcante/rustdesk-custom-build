@@ -20,7 +20,7 @@ jobs:
       - name: Install Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.22.3'
+          flutter-version: '3.24.5'
           channel: 'stable'
       - name: Install codegen
         run: |
@@ -136,4 +136,4 @@ jobs:
         with:
           tag_name: "v1.0.0-build"
           files: dist/Sunev-Windows-64bits.exe
-# Force triggering GitHub Actions
+# Fix Flutter SDK version for extended_text
