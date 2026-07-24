@@ -5,6 +5,10 @@ on:
     branches: [ "main", "master" ]
   workflow_dispatch:
 
+permissions:
+  contents: write
+  packages: write
+
 jobs:
   # 1. GERAR PONTE RUST-FLUTTER (EXIGIDO PELO RUSTDESK)
   generate-bridge:
@@ -123,6 +127,7 @@ jobs:
         with:
           toolchain: "1.75"
           targets: x86_64-pc-windows-msvc
+          components: rustfmt
 
       - name: Install Flutter
         uses: subosito/flutter-action@v2
@@ -132,7 +137,7 @@ jobs:
       - name: Build RustDesk Portable
         shell: pwsh
         run: |
-          python3 .\build.py --portable --flutter --skip-portable-pack --hwcodec
+          python3 .\build.py --portable --flutter --skip-portable-pack
           mkdir dist
           cp ./flutter/build/windows/x64/runner/Release/rustdesk.exe dist/Sunev-Windows-64bits.exe
 
@@ -141,4 +146,4 @@ jobs:
         with:
           tag_name: "v1.0.0-build"
           files: dist/Sunev-Windows-64bits.exe
-# Update Rust toolchain to 1.85.0 for bridge generation
+# Fix write permissions for release and windows rustfmt/hwcodec
