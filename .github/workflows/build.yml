@@ -26,7 +26,7 @@ jobs:
           channel: 'stable'
       - name: Install codegen
         run: |
-          cargo install cargo-expand --version 1.0.95
+          cargo install cargo-expand --version 1.0.80
           cargo install flutter_rust_bridge_codegen --version 1.80.1 --features "uuid"
           cd flutter && flutter pub get
       - name: Run bridge
@@ -138,4 +138,4 @@ jobs:
         with:
           tag_name: "v1.0.0-build"
           files: dist/Sunev-Windows-64bits.exe
-# Force rustfmt component installation via rustup
+# Pin cargo-expand to 1.0.80 to avoid Rust edition 2024
