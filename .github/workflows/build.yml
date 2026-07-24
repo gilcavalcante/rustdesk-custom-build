@@ -6,206 +6,133 @@ on:
   workflow_dispatch:
 
 jobs:
-  # ==========================================
-  # 1. WINDOWS 64-BITS E 32-BITS (.EXE UNIVERSAL)
-  # ==========================================
-  build-windows:
-    name: Windows ${{ matrix.arch }}
-    runs-on: windows-2022
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - target: x86_64-pc-windows-msvc
-            arch: 64bits
-            vcpkg-triplet: x64-windows-static
-          - target: i686-pc-windows-msvc
-            arch: 32bits
-            vcpkg-triplet: x86-windows-static
-
+  # 1. GERAR PONTE RUST-FLUTTER (EXIGIDO PELO RUSTDESK)
+  generate-bridge:
+    runs-on: ubuntu-22.04
     steps:
-      - name: Checkout do Código
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           submodules: recursive
-
-      - name: Instalar LLVM e Clang
-        uses: KyleMayes/install-llvm-action@v2
-        with:
-          version: "15.0"
-
-      - name: Instalar Rust
+      - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.target }}
-
-      - name: Baixar Dependencias Nativas Windows (VCPKG)
-        shell: pwsh
-        run: |
-          $env:VCPKG_ROOT = "$env:GITHUB_WORKSPACE\vcpkg"
-          git clone https://github.com/microsoft/vcpkg.git $env:VCPKG_ROOT
-          & "$env:VCPKG_ROOT\bootstrap-vcpkg.bat" -disableMetrics
-          & "$env:VCPKG_ROOT\vcpkg.exe" install opus:${{ matrix.vcpkg-triplet }} libvpx:${{ matrix.vcpkg-triplet }} libsodium:${{ matrix.vcpkg-triplet }}
-
-      - name: Compilar RustDesk Windows (${{ matrix.arch }})
-        shell: cmd
-        run: |
-          set VCPKG_ROOT=%GITHUB_WORKSPACE%\vcpkg
-          set VCPKG_TARGET_TRIPLET=${{ matrix.vcpkg-triplet }}
-          set RUSTFLAGS=-C target-feature=+crt-static
-          cargo build --release --target ${{ matrix.target }}
-
-      - name: Baixar Monitor Virtual (usbmmidd) e Organizar
-        shell: pwsh
-        run: |
-          mkdir -p dist
-          cp target/${{ matrix.target }}/release/rustdesk.exe dist/Sunev-Windows-${{ matrix.arch }}.exe
-          
-          # Baixar suporte a monitor virtual sem certificado
-          Invoke-WebRequest -Uri https://github.com/rustdesk-org/rdev/releases/download/usbmmidd_v2/usbmmidd_v2.zip -OutFile usbmmidd_v2.zip
-          Expand-Archive usbmmidd_v2.zip -DestinationPath dist/
-          Remove-Item -Path dist/usbmmidd_v2/Win32 -Recurse -ErrorAction SilentlyContinue
-
-      - name: Publicar Release no GitHub (Download Direto)
-        uses: softprops/action-gh-release@v1
+          toolchain: '1.75'
+      - name: Install Flutter
+        uses: subosito/flutter-action@v2
         with:
-          tag_name: "v1.0.0-build"
-          prerelease: false
-          files: |
-            dist/Sunev-Windows-${{ matrix.arch }}.exe
-
-  # ==========================================
-  # 2. LINUX 64-BITS E 32-BITS (.DEB UNIVERSAL)
-  # ==========================================
-  build-linux:
-    name: Linux ${{ matrix.arch }}
-    runs-on: ubuntu-20.04
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - target: x86_64-unknown-linux-gnu
-            arch: 64bits
-          - target: i686-unknown-linux-gnu
-            arch: 32bits
-
-    steps:
-      - name: Checkout do Código
-        uses: actions/checkout@v4
+          flutter-version: '3.22.3'
+          channel: 'stable'
+      - name: Install codegen
+        run: |
+          cargo install cargo-expand --version 1.0.95 --locked
+          cargo install flutter_rust_bridge_codegen --version 1.80.1 --features "uuid" --locked
+          cd flutter && flutter pub get
+      - name: Run bridge
+        run: |
+          ~/.cargo/bin/flutter_rust_bridge_codegen --rust-input ./src/flutter_ffi.rs --dart-output ./flutter/lib/generated_bridge.dart --c-output ./flutter/macos/Runner/bridge_generated.h
+          cp ./flutter/macos/Runner/bridge_generated.h ./flutter/ios/Runner/bridge_generated.h
+      - name: Upload Bridge Artifact
+        uses: actions/upload-artifact@v4
         with:
-          submodules: recursive
+          name: bridge-artifact
+          path: |
+            ./src/bridge_generated.rs
+            ./src/bridge_generated.io.rs
+            ./flutter/lib/generated_bridge.dart
+            ./flutter/lib/generated_bridge.freezed.dart
 
-      - name: Instalar Dependencias Nativas do Linux
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            build-essential gcc-multilib g++-multilib clang llvm lld libclang-dev \
-            libgtk-3-dev libxcb-randr0-dev libxdo-dev libxfixes-dev \
-            libxcb-shape0-dev libxcb-xfixes0-dev libasound2-dev libpulse-dev \
-            libva-dev libvdpau-dev patchelf cmake ninja-build nasm yasm wget curl
-
-      - name: Baixar Sciter SDK
-        run: |
-          mkdir -p /tmp/sciter
-          wget https://raw.githubusercontent.com/c-smile/sciter-sdk/master/bin.lnx/x64/libsciter-gtk.so -O /tmp/sciter/libsciter-gtk.so
-          sudo cp /tmp/sciter/libsciter-gtk.so /usr/lib/
-
-      - name: Instalar Rust e Cargo Bundle
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.target }}
-
-      - name: Instalar Cargo Bundle
-        run: cargo install cargo-bundle --force
-
-      - name: Compilar e Embutir 100% das Bibliotecas (.SO)
-        run: |
-          cargo build --release --target ${{ matrix.target }}
-          
-          TARGET_DIR="target/${{ matrix.target }}/release"
-          mkdir -p $TARGET_DIR/lib
-          cp /tmp/sciter/libsciter-gtk.so $TARGET_DIR/lib/
-          
-          # Coletar todas as dependencias .so do sistema
-          for lib in $(ldd $TARGET_DIR/rustdesk | grep '=>' | awk '{print $3}' | grep '^/'); do
-            cp -L $lib $TARGET_DIR/lib/ 2>/dev/null || true
-          done
-          
-          patchelf --set-rpath '$ORIGIN/lib' $TARGET_DIR/rustdesk || true
-          cargo bundle --release --target ${{ matrix.target }} || true
-
-      - name: Organizar Pacotes DEB
-        run: |
-          mkdir -p dist
-          find target/${{ matrix.target }}/release/bundle/deb -name "*.deb" -exec cp {} dist/Sunev-Linux-${{ matrix.arch }}.deb \; || cp target/${{ matrix.target }}/release/rustdesk dist/Sunev-Linux-${{ matrix.arch }}
-
-      - name: Publicar Release no GitHub (Download Direto)
-        uses: softprops/action-gh-release@v1
-        with:
-          tag_name: "v1.0.0-build"
-          prerelease: false
-          files: |
-            dist/Sunev-Linux-${{ matrix.arch }}.deb
-
-  # ==========================================
-  # 3. ANDROID UNIVERSAL (APK 32 E 64 BITS EMBUTIDO)
-  # ==========================================
-  build-android:
+  # 2. ANDROID UNIVERSAL APK
+  build-android-universal:
+    needs: [generate-bridge]
     name: Android Universal APK
     runs-on: ubuntu-22.04
-
     steps:
-      - name: Checkout do Código
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           submodules: recursive
 
-      - name: Instalar Dependencias do Sistema Host
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            build-essential clang cmake ninja-build pkg-config \
-            lib32stdc++6 lib32z1 curl git openjdk-17-jdk
+      - name: Download Bridge
+        uses: actions/download-artifact@v4
+        with:
+          name: bridge-artifact
+          path: ./
 
-      - name: Configurar Java JDK
+      - name: Setup Java
         uses: actions/setup-java@v4
         with:
-          distribution: 'zulu'
+          distribution: 'temurin'
           java-version: '17'
 
-      - name: Configurar Android NDK
-        uses: nsetup/setup-android-ndk@v1
+      - name: Setup Android NDK
+        uses: nttld/setup-ndk@v1
         with:
           ndk-version: r25c
 
-      - name: Instalar Rust e Targets Android
+      - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: aarch64-linux-android, armv7-linux-androideabi, x86_64-linux-android, i686-linux-android
+          toolchain: '1.75'
+          targets: aarch64-linux-android, armv7-linux-androideabi, x86_64-linux-android
 
-      - name: Instalar Flutter SDK
+      - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.19.x'
-          channel: 'stable'
+          flutter-version: '3.24.5'
 
-      - name: Compilar APK Universal (Nao Assinado / Sem Chave)
+      - name: Build APK Universal
         run: |
-          cd flutter || true
-          # Forcar uso das configuracoes debug/unsigned pra nao pedir chave
+          cd flutter
           sed -i "s/signingConfigs.release/signingConfigs.debug/g" android/app/build.gradle || true
-          flutter pub get || true
+          flutter pub get
           flutter build apk --release --target-platform android-arm,android-arm64,android-x64
 
-      - name: Organizar APK Final
-        run: |
-          mkdir -p dist
-          cp flutter/build/app/outputs/flutter-apk/app-release.apk dist/Sunev-Android-Universal.apk || cp build/app/outputs/flutter-apk/app-release.apk dist/Sunev-Android-Universal.apk
-
-      - name: Publicar Release no GitHub (Download Direto)
+      - name: Publish Android Release
         uses: softprops/action-gh-release@v1
         with:
           tag_name: "v1.0.0-build"
-          prerelease: false
-          files: |
-            dist/Sunev-Android-Universal.apk
+          files: flutter/build/app/outputs/flutter-apk/app-release.apk
+
+  # 3. WINDOWS 64-BITS
+  build-windows-64:
+    needs: [generate-bridge]
+    name: Windows 64bits
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Download Bridge
+        uses: actions/download-artifact@v4
+        with:
+          name: bridge-artifact
+          path: ./
+
+      - name: Install LLVM
+        uses: KyleMayes/install-llvm-action@v2
+        with:
+          version: "15.0.6"
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.75"
+          targets: x86_64-pc-windows-msvc
+
+      - name: Install Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.24.5"
+
+      - name: Build RustDesk Portable
+        shell: pwsh
+        run: |
+          python3 .\build.py --portable --flutter --skip-portable-pack --hwcodec
+          mkdir dist
+          cp ./flutter/build/windows/x64/runner/Release/rustdesk.exe dist/Sunev-Windows-64bits.exe
+
+      - name: Publish Windows 64 Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: "v1.0.0-build"
+          files: dist/Sunev-Windows-64bits.exe
