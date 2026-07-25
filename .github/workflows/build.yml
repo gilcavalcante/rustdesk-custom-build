@@ -1,4 +1,4 @@
-name: Sunev Windows Universal Build (64-bits & 32-bits)
+name: Sunev Windows 32-bits Portable Build
 
 on:
   push:
@@ -50,60 +50,7 @@ jobs:
             ./flutter/lib/generated_bridge.dart
             ./flutter/lib/generated_bridge.freezed.dart
 
-  # 2. WINDOWS 64-BITS (x64)
-  build-windows-64:
-    needs: [generate-bridge]
-    name: Windows 64bits
-    runs-on: windows-2022
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: recursive
-
-      - name: Download Bridge
-        uses: actions/download-artifact@v4
-        with:
-          name: bridge-artifact
-          path: ./
-
-      - name: Install LLVM
-        uses: KyleMayes/install-llvm-action@v2
-        with:
-          version: "15.0.6"
-
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: "1.75"
-          targets: x86_64-pc-windows-msvc
-          components: rustfmt
-
-      - name: Install Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: "3.24.5"
-
-      - name: Setup VCPKG Dependencies (64-bit)
-        shell: pwsh
-        run: |
-          vcpkg install --classic opus:x64-windows-static libyuv:x64-windows-static libvpx:x64-windows-static aom:x64-windows-static ffmpeg:x64-windows-static pkgconf:x64-windows-static
-
-      - name: Build RustDesk & Zip Windows 64 Package
-        shell: pwsh
-        env:
-          VCPKG_ROOT: "C:/vcpkg"
-          VCPKG_DEFAULT_TRIPLET: "x64-windows-static"
-        run: |
-          python3 .\build.py --portable --flutter --skip-portable-pack
-          Compress-Archive -Path ./flutter/build/windows/x64/runner/Release/* -DestinationPath ./Sunev-Windows-64bits.zip
-
-      - name: Publish Windows 64 Release
-        uses: softprops/action-gh-release@v1
-        with:
-          tag_name: "v1.0.0-build"
-          files: Sunev-Windows-64bits.zip
-
-  # 3. WINDOWS 32-BITS (x86)
+  # 2. WINDOWS 32-BITS PORTABLE (x86)
   build-windows-32:
     needs: [generate-bridge]
     name: Windows 32bits
@@ -124,7 +71,7 @@ jobs:
         with:
           version: "15.0.6"
 
-      - name: Install Rust
+      - name: Install Rust 32-bits
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: "1.75"
@@ -155,4 +102,4 @@ jobs:
         with:
           tag_name: "v1.0.0-build"
           files: Sunev-Windows-32bits.zip
-# Add Windows 32-bit build alongside 64-bit
+# Windows 32-bit portable build workflow
