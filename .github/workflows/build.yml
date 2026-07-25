@@ -1,4 +1,4 @@
-name: Sunev Universal Build (Windows, Linux, Android)
+name: Sunev Windows Build
 
 on:
   push:
@@ -50,59 +50,7 @@ jobs:
             ./flutter/lib/generated_bridge.dart
             ./flutter/lib/generated_bridge.freezed.dart
 
-  # 2. ANDROID UNIVERSAL APK (COM JNILIBS DO RUST)
-  build-android-universal:
-    needs: [generate-bridge]
-    name: Android Universal APK
-    runs-on: ubuntu-22.04
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: recursive
-
-      - name: Download Bridge
-        uses: actions/download-artifact@v4
-        with:
-          name: bridge-artifact
-          path: ./
-
-      - name: Setup Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
-
-      - name: Setup Android NDK
-        uses: nttld/setup-ndk@v1
-        with:
-          ndk-version: r25c
-
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: '1.75'
-          targets: aarch64-linux-android, armv7-linux-androideabi, x86_64-linux-android
-
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.24.5'
-
-      - name: Build Rust Native Libs & APK
-        run: |
-          python3 build.py --android
-          cd flutter
-          sed -i "s/signingConfigs.release/signingConfigs.debug/g" android/app/build.gradle || true
-          flutter pub get
-          flutter build apk --release
-
-      - name: Publish Android Release
-        uses: softprops/action-gh-release@v1
-        with:
-          tag_name: "v1.0.0-build"
-          files: flutter/build/app/outputs/flutter-apk/app-release.apk
-
-  # 3. WINDOWS 64-BITS (PACOTE COMPLETO COM DLLS)
+  # 2. WINDOWS 64-BITS (PACOTE COMPLETO COM DLLS)
   build-windows-64:
     needs: [generate-bridge]
     name: Windows 64bits
@@ -154,4 +102,4 @@ jobs:
         with:
           tag_name: "v1.0.0-build"
           files: Sunev-Windows-64bits.zip
-# Bundle native rust libs for Android and zip DLLs for Windows
+# Focus on Windows build only
