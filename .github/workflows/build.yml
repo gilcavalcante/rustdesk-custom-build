@@ -1,4 +1,4 @@
-name: Sunev Windows Build
+name: Sunev Windows Universal Build (64-bits & 32-bits)
 
 on:
   push:
@@ -50,7 +50,7 @@ jobs:
             ./flutter/lib/generated_bridge.dart
             ./flutter/lib/generated_bridge.freezed.dart
 
-  # 2. WINDOWS 64-BITS (PACOTE COMPLETO COM DLLS)
+  # 2. WINDOWS 64-BITS (x64)
   build-windows-64:
     needs: [generate-bridge]
     name: Windows 64bits
@@ -83,12 +83,12 @@ jobs:
         with:
           flutter-version: "3.24.5"
 
-      - name: Setup ALL VCPKG Dependencies 100%
+      - name: Setup VCPKG Dependencies (64-bit)
         shell: pwsh
         run: |
           vcpkg install --classic opus:x64-windows-static libyuv:x64-windows-static libvpx:x64-windows-static aom:x64-windows-static ffmpeg:x64-windows-static pkgconf:x64-windows-static
 
-      - name: Build RustDesk & Zip Windows Package
+      - name: Build RustDesk & Zip Windows 64 Package
         shell: pwsh
         env:
           VCPKG_ROOT: "C:/vcpkg"
@@ -102,4 +102,57 @@ jobs:
         with:
           tag_name: "v1.0.0-build"
           files: Sunev-Windows-64bits.zip
-# Focus on Windows build only
+
+  # 3. WINDOWS 32-BITS (x86)
+  build-windows-32:
+    needs: [generate-bridge]
+    name: Windows 32bits
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Download Bridge
+        uses: actions/download-artifact@v4
+        with:
+          name: bridge-artifact
+          path: ./
+
+      - name: Install LLVM
+        uses: KyleMayes/install-llvm-action@v2
+        with:
+          version: "15.0.6"
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.75"
+          targets: i686-pc-windows-msvc
+          components: rustfmt
+
+      - name: Install Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.24.5"
+
+      - name: Setup VCPKG Dependencies (32-bit)
+        shell: pwsh
+        run: |
+          vcpkg install --classic opus:x86-windows-static libyuv:x86-windows-static libvpx:x86-windows-static aom:x86-windows-static ffmpeg:x86-windows-static pkgconf:x86-windows-static
+
+      - name: Build RustDesk & Zip Windows 32 Package
+        shell: pwsh
+        env:
+          VCPKG_ROOT: "C:/vcpkg"
+          VCPKG_DEFAULT_TRIPLET: "x86-windows-static"
+        run: |
+          python3 .\build.py --portable --flutter --skip-portable-pack
+          Compress-Archive -Path ./flutter/build/windows/x86/runner/Release/* -DestinationPath ./Sunev-Windows-32bits.zip
+
+      - name: Publish Windows 32 Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: "v1.0.0-build"
+          files: Sunev-Windows-32bits.zip
+# Add Windows 32-bit build alongside 64-bit
