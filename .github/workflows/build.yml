@@ -50,7 +50,7 @@ jobs:
             ./flutter/lib/generated_bridge.dart
             ./flutter/lib/generated_bridge.freezed.dart
 
-  # 2. ANDROID UNIVERSAL APK
+  # 2. ANDROID UNIVERSAL APK (COM JNILIBS DO RUST)
   build-android-universal:
     needs: [generate-bridge]
     name: Android Universal APK
@@ -88,12 +88,13 @@ jobs:
         with:
           flutter-version: '3.24.5'
 
-      - name: Build APK Universal
+      - name: Build Rust Native Libs & APK
         run: |
+          python3 build.py --android
           cd flutter
           sed -i "s/signingConfigs.release/signingConfigs.debug/g" android/app/build.gradle || true
           flutter pub get
-          flutter build apk --release --target-platform android-arm,android-arm64,android-x64
+          flutter build apk --release
 
       - name: Publish Android Release
         uses: softprops/action-gh-release@v1
@@ -101,7 +102,7 @@ jobs:
           tag_name: "v1.0.0-build"
           files: flutter/build/app/outputs/flutter-apk/app-release.apk
 
-  # 3. WINDOWS 64-BITS
+  # 3. WINDOWS 64-BITS (PACOTE COMPLETO COM DLLS)
   build-windows-64:
     needs: [generate-bridge]
     name: Windows 64bits
@@ -139,19 +140,18 @@ jobs:
         run: |
           vcpkg install --classic opus:x64-windows-static libyuv:x64-windows-static libvpx:x64-windows-static aom:x64-windows-static ffmpeg:x64-windows-static pkgconf:x64-windows-static
 
-      - name: Build RustDesk Portable
+      - name: Build RustDesk & Zip Windows Package
         shell: pwsh
         env:
           VCPKG_ROOT: "C:/vcpkg"
           VCPKG_DEFAULT_TRIPLET: "x64-windows-static"
         run: |
           python3 .\build.py --portable --flutter --skip-portable-pack
-          mkdir dist
-          cp ./flutter/build/windows/x64/runner/Release/rustdesk.exe dist/Sunev-Windows-64bits.exe
+          Compress-Archive -Path ./flutter/build/windows/x64/runner/Release/* -DestinationPath ./Sunev-Windows-64bits.zip
 
       - name: Publish Windows 64 Release
         uses: softprops/action-gh-release@v1
         with:
           tag_name: "v1.0.0-build"
-          files: dist/Sunev-Windows-64bits.exe
-# Full VCPKG dependencies setup for Windows
+          files: Sunev-Windows-64bits.zip
+# Bundle native rust libs for Android and zip DLLs for Windows
