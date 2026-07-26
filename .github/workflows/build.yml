@@ -1,4 +1,4 @@
-name: Sunev Windows 64-bits Installer Build
+name: Sunev Multi-Platform Full Parallel Build
 
 on:
   push:
@@ -10,6 +10,7 @@ permissions:
   packages: write
 
 jobs:
+  # 1. GERAR PONTE RUST-FLUTTER (Compartilhada ou base)
   generate-bridge:
     runs-on: ubuntu-22.04
     steps:
@@ -49,9 +50,10 @@ jobs:
             ./flutter/lib/generated_bridge.dart
             ./flutter/lib/generated_bridge.freezed.dart
 
-  build-windows-64:
+  # 2. WINDOWS 32-BITS PORTABLE
+  build-windows-32:
     needs: [generate-bridge]
-    name: Windows 64bits
+    name: Windows 32-bits Portable
     runs-on: windows-2022
     steps:
       - uses: actions/checkout@v4
@@ -69,11 +71,11 @@ jobs:
         with:
           version: "15.0.6"
 
-      - name: Install Rust
+      - name: Install Rust 32-bit
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: "1.75"
-          targets: x86_64-pc-windows-msvc
+          targets: i686-pc-windows-msvc
           components: rustfmt
 
       - name: Install Flutter
@@ -81,37 +83,118 @@ jobs:
         with:
           flutter-version: "3.24.5"
 
-      - name: Setup ALL VCPKG Dependencies
+      - name: Setup VCPKG Dependencies
         shell: pwsh
         run: |
-          vcpkg install --classic opus:x64-windows-static libyuv:x64-windows-static libvpx:x64-windows-static aom:x64-windows-static ffmpeg:x64-windows-static pkgconf:x64-windows-static
+          vcpkg install --classic opus:x86-windows-static libyuv:x86-windows-static libvpx:x86-windows-static aom:x86-windows-static ffmpeg:x86-windows-static pkgconf:x86-windows-static
 
-      - name: Download Virtual Display Drivers
-        shell: pwsh
-        run: |
-          mkdir -p res
-          Invoke-WebRequest -Uri "https://raw.githubusercontent.com/rustdesk/rustdesk/master/res/usbmmidd_v2.zip" -OutFile "res/usbmmidd_v2.zip"
-          Expand-Archive -Path "res/usbmmidd_v2.zip" -DestinationPath "res/usbmmidd_v2" -Force
-
-      - name: Build RustDesk & Compile EXE Installer via Inno Setup
+      - name: Build Windows 32 Portable
         shell: pwsh
         env:
           VCPKG_ROOT: "C:/vcpkg"
-          VCPKG_DEFAULT_TRIPLET: "x64-windows-static"
+          VCPKG_DEFAULT_TRIPLET: "x86-windows-static"
+          CARGO_BUILD_TARGET: "i686-pc-windows-msvc"
         run: |
           python3 .\build.py --portable --flutter --skip-portable-pack
           New-Item -ItemType Directory -Force -Path dist_app
-          Copy-Item -Recurse -Path ./flutter/build/windows/x64/runner/Release/* -Destination dist_app/ -Force
-          if (Test-Path "target/release/librustdesk.dll") { Copy-Item -Path "target/release/librustdesk.dll" -Destination dist_app/ -Force }
-          if (Test-Path "target/release/rustdesk.exe") { Copy-Item -Path "target/release/rustdesk.exe" -Destination dist_app/ -Force }
-          if (Test-Path "res/usbmmidd_v2") { Copy-Item -Recurse -Path "res/usbmmidd_v2" -Destination dist_app/ -Force }
-          if (Test-Path "res/drivers") { Copy-Item -Recurse -Path "res/drivers" -Destination dist_app/ -Force }
+          Copy-Item -Recurse -Path ./flutter/build/windows/x86/runner/Release/* -Destination dist_app/ -Force
+          if (Test-Path "target/i686-pc-windows-msvc/release/librustdesk.dll") { Copy-Item -Path "target/i686-pc-windows-msvc/release/librustdesk.dll" -Destination dist_app/ -Force }
+          elseif (Test-Path "target/release/librustdesk.dll") { Copy-Item -Path "target/release/librustdesk.dll" -Destination dist_app/ -Force }
+          if (Test-Path "target/i686-pc-windows-msvc/release/rustdesk.exe") { Copy-Item -Path "target/i686-pc-windows-msvc/release/rustdesk.exe" -Destination dist_app/ -Force }
+          elseif (Test-Path "target/release/rustdesk.exe") { Copy-Item -Path "target/release/rustdesk.exe" -Destination dist_app/ -Force }
           if (Test-Path "dist_app/rustdesk.exe") { Rename-Item -Path "dist_app/rustdesk.exe" -NewName "Sunev.exe" -Force }
-          if (Test-Path "res/msi/sunev.iss") { & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DAppExeName=Sunev.exe /DAppFolder=dist_app res/msi/sunev.iss /O. /F"Sunev-Setup-x64" } else { & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DAppExeName=Sunev.exe /DAppFolder=dist_app res/msi/rustdesk.iss /O. /F"Sunev-Setup-x64" }
+          Compress-Archive -Path dist_app/* -DestinationPath ./Sunev-Windows-32bits-Portable.zip -Force
 
-      - name: Publish Windows 64 Release
+      - name: Publish Windows 32 Release
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: "v1.0.2-exe"
-          files: Sunev-Setup-x64.exe
-# Remove comments and blank lines to clean nano indentation
+          tag_name: "v1.0.3-multi"
+          files: Sunev-Windows-32bits-Portable.zip
+
+  # 3. ANDROID APK UNIVERSAL
+  build-android:
+    needs: [generate-bridge]
+    name: Android Universal APK
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Download Bridge
+        uses: actions/download-artifact@v4
+        with:
+          name: bridge-artifact
+          path: ./
+
+      - name: Install Rust & Android Targets
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: '1.85.0'
+          targets: 'aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android'
+
+      - name: Install Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.24.5'
+          channel: 'stable'
+
+      - name: Build Android APK via Python Script
+        run: |
+          python3 build.py --android
+
+      - name: Prepare APK Artifact
+        run: |
+          mkdir -p dist_android
+          # Localiza o APK gerado pelo flutter e copia renomeando para Sunev-Universal.apk
+          find flutter/build/app/outputs/flutter-apk/ -name "*.apk" -exec cp {} dist_android/Sunev-Universal.apk \;
+
+      - name: Publish Android Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: "v1.0.3-multi"
+          files: dist_android/Sunev-Universal.apk
+
+  # 4. LINUX 64-BITS DEB
+  build-linux:
+    needs: [generate-bridge]
+    name: Linux 64-bits DEB
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Download Bridge
+        uses: actions/download-artifact@v4
+        with:
+          name: bridge-artifact
+          path: ./
+
+      - name: Install System Dependencies
+        run: |
+          sudo apt update && sudo apt install -y yasm nasm libgtk-3-dev libclang-dev libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev
+
+      - name: Install Rust & Flutter
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: '1.85.0'
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.24.5'
+          channel: 'stable'
+
+      - name: Build Linux Package via Python Script
+        run: |
+          python3 build.py --linux
+
+      - name: Prepare Linux DEB Artifact
+        run: |
+          mkdir -p dist_linux
+          find target/release/bundle/debs/ -name "*.deb" -exec cp {} dist_linux/ \; || find . -name "*.deb" -exec cp {} dist_linux/ \;
+
+      - name: Publish Linux Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: "v1.0.3-multi"
+          files: dist_linux/*.deb
