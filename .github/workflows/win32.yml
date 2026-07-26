@@ -1,0 +1,108 @@
+name: Build Windows 32-bits Portable
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  generate-bridge:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: '1.85.0'
+          components: rustfmt
+
+      - name: Install Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.24.5'
+
+      - name: Install codegen
+        run: |
+          cargo install flutter_rust_bridge_codegen --version 1.80.1 --features "uuid"
+          cd flutter && flutter pub get
+
+      - name: Run bridge
+        run: |
+          ~/.cargo/bin/flutter_rust_bridge_codegen --rust-input ./src/flutter_ffi.rs --dart-output ./flutter/lib/generated_bridge.dart --c-output ./flutter/macos/Runner/bridge_generated.h --skip-deps-check
+          cp ./flutter/macos/Runner/bridge_generated.h ./flutter/ios/Runner/bridge_generated.h
+
+      - name: Upload Bridge
+        uses: actions/upload-artifact@v4
+        with:
+          name: bridge-win32
+          path: |
+            ./src/bridge_generated.rs
+            ./src/bridge_generated.io.rs
+            ./flutter/lib/generated_bridge.dart
+            ./flutter/lib/generated_bridge.freezed.dart
+
+  build-win32:
+    needs: [generate-bridge]
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Download Bridge
+        uses: actions/download-artifact@v4
+        with:
+          name: bridge-win32
+          path: ./
+
+      - name: Install LLVM
+        uses: KyleMayes/install-llvm-action@v2
+        with:
+          version: "15.0.6"
+
+      - name: Install Rust 32-bit
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.75"
+          targets: i686-pc-windows-msvc
+          components: rustfmt
+
+      - name: Install Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.24.5"
+
+      - name: Setup VCPKG 32-bit
+        shell: pwsh
+        run: |
+          vcpkg install --classic opus:x86-windows-static libyuv:x86-windows-static libvpx:x86-windows-static aom:x86-windows-static ffmpeg:x86-windows-static pkgconf:x86-windows-static
+
+      - name: Build Win32 Portable
+        shell: pwsh
+        env:
+          VCPKG_ROOT: "C:/vcpkg"
+          VCPKG_DEFAULT_TRIPLET: "x86-windows-static"
+          CARGO_BUILD_TARGET: "i686-pc-windows-msvc"
+        run: |
+          python3 .\build.py --portable --flutter --skip-portable-pack
+          New-Item -ItemType Directory -Force -Path dist_win32
+          Copy-Item -Recurse -Path ./flutter/build/windows/x86/runner/Release/* -Destination dist_win32/ -Force
+          if (Test-Path "target/i686-pc-windows-msvc/release/librustdesk.dll") { Copy-Item -Path "target/i686-pc-windows-msvc/release/librustdesk.dll" -Destination dist_win32/ -Force }
+          elseif (Test-Path "target/release/librustdesk.dll") { Copy-Item -Path "target/release/librustdesk.dll" -Destination dist_win32/ -Force }
+          if (Test-Path "target/i686-pc-windows-msvc/release/rustdesk.exe") { Copy-Item -Path "target/i686-pc-windows-msvc/release/rustdesk.exe" -Destination dist_win32/ -Force }
+          elseif (Test-Path "target/release/rustdesk.exe") { Copy-Item -Path "target/release/rustdesk.exe" -Destination dist_win32/ -Force }
+          if (Test-Path "dist_win32/rustdesk.exe") { Rename-Item -Path "dist_win32/rustdesk.exe" -NewName "Sunev.exe" -Force }
+          Compress-Archive -Path dist_win32/* -DestinationPath ./Sunev-Windows-32bits-Portable.zip -Force
+
+      - name: Publish Win32 Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: "v1.0.0-win32"
+          files: Sunev-Windows-32bits-Portable.zip
