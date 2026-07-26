@@ -1,8 +1,6 @@
 name: Build Windows 32-bits Portable
 
 on:
-  push:
-    branches: [ "main", "master" ]
   workflow_dispatch:
 
 permissions:
