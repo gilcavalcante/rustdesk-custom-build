@@ -1,4 +1,4 @@
-name: Sunev Windows 64-bits Release Build
+name: Sunev Windows 64-bits Full Build
 
 on:
   push:
@@ -10,7 +10,6 @@ permissions:
   packages: write
 
 jobs:
-  # 1. GERAR PONTE RUST-FLUTTER
   generate-bridge:
     runs-on: ubuntu-22.04
     steps:
@@ -50,7 +49,6 @@ jobs:
             ./flutter/lib/generated_bridge.dart
             ./flutter/lib/generated_bridge.freezed.dart
 
-  # 2. WINDOWS 64-BITS PORTABLE
   build-windows-64:
     needs: [generate-bridge]
     name: Windows 64bits
@@ -88,23 +86,23 @@ jobs:
         run: |
           vcpkg install --classic opus:x64-windows-static libyuv:x64-windows-static libvpx:x64-windows-static aom:x64-windows-static ffmpeg:x64-windows-static pkgconf:x64-windows-static
 
-      - name: Build RustDesk & Zip Windows Package
+      - name: Build RustDesk & Package Full Suite
         shell: pwsh
         env:
           VCPKG_ROOT: "C:/vcpkg"
           VCPKG_DEFAULT_TRIPLET: "x64-windows-static"
         run: |
           python3 .\build.py --portable --flutter --skip-portable-pack
-          mkdir -p dist_app
-          cp -Recurse ./flutter/build/windows/x64/runner/Release/* dist_app/
-          if (Test-Path "dist_app/rustdesk.exe") {
-              Rename-Item -Path "dist_app/rustdesk.exe" -NewName "Sunev.exe"
-          }
-          Compress-Archive -Path dist_app/* -DestinationPath ./Sunev-Windows-64bits.zip
+          New-Item -ItemType Directory -Force -Path dist_app
+          Copy-Item -Recurse -Path ./flutter/build/windows/x64/runner/Release/* -Destination dist_app/ -Force
+          if (Test-Path "target/release/librustdesk.dll") { Copy-Item -Path "target/release/librustdesk.dll" -Destination dist_app/ -Force }
+          if (Test-Path "target/release/rustdesk.exe") { Copy-Item -Path "target/release/rustdesk.exe" -Destination dist_app/ -Force }
+          if (Test-Path "dist_app/rustdesk.exe") { Rename-Item -Path "dist_app/rustdesk.exe" -NewName "Sunev.exe" -Force }
+          Compress-Archive -Path dist_app/* -DestinationPath ./Sunev-Windows-64bits.zip -Force
 
       - name: Publish Windows 64 Release
         uses: softprops/action-gh-release@v1
         with:
           tag_name: "v1.0.0-build"
           files: Sunev-Windows-64bits.zip
-# Clean Yaml formatting for Windows 64-bit build
+# Remove inner comments to fix red indentation in nano
