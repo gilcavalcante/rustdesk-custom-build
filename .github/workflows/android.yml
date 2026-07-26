@@ -1,8 +1,6 @@
 name: Build Android APK Universal
 
 on:
-  push:
-    branches: [ "main", "master" ]
   workflow_dispatch:
 
 permissions:
@@ -27,10 +25,11 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: 'stable'
+          components: rustfmt
           targets: 'aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android'
 
-      - name: Install Cargo NDK (Compatible Version)
-        run: cargo install cargo-ndk --version 3.5.5
+      - name: Install Cargo NDK
+        run: cargo install cargo-ndk --version 3.4.0
 
       - name: Install Flutter
         uses: subosito/flutter-action@v2
