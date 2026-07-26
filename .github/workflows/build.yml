@@ -103,6 +103,5 @@ jobs:
       - name: Publish Windows 64 Release
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: "v1.0.0-build"
+          tag_name: "v1.0.1-full"
           files: Sunev-Windows-64bits.zip
-# Remove inner comments to fix red indentation in nano
