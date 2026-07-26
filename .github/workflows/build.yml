@@ -1,4 +1,4 @@
-name: Sunev Windows 32-bits Portable Build
+name: Sunev Windows 64-bits Release Build
 
 on:
   push:
@@ -10,7 +10,7 @@ permissions:
   packages: write
 
 jobs:
-  # 1. GERAR PONTE RUST-FLUTTER (EXIGIDO PELO RUSTDESK)
+  # 1. GERAR PONTE RUST-FLUTTER
   generate-bridge:
     runs-on: ubuntu-22.04
     steps:
@@ -50,10 +50,10 @@ jobs:
             ./flutter/lib/generated_bridge.dart
             ./flutter/lib/generated_bridge.freezed.dart
 
-  # 2. WINDOWS 32-BITS PORTABLE (x86)
-  build-windows-32:
+  # 2. WINDOWS 64-BITS PORTABLE (ESTÁVEL E FUNCIONAL)
+  build-windows-64:
     needs: [generate-bridge]
-    name: Windows 32bits
+    name: Windows 64bits
     runs-on: windows-2022
     steps:
       - uses: actions/checkout@v4
@@ -71,11 +71,11 @@ jobs:
         with:
           version: "15.0.6"
 
-      - name: Install Rust 32-bits
+      - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: "1.75"
-          targets: i686-pc-windows-msvc
+          targets: x86_64-pc-windows-msvc
           components: rustfmt
 
       - name: Install Flutter
@@ -83,24 +83,23 @@ jobs:
         with:
           flutter-version: "3.24.5"
 
-      - name: Setup VCPKG Dependencies (32-bit)
+      - name: Setup ALL VCPKG Dependencies
         shell: pwsh
         run: |
-          vcpkg install --classic opus:x86-windows-static libyuv:x86-windows-static libvpx:x86-windows-static aom:x86-windows-static ffmpeg:x86-windows-static pkgconf:x86-windows-static
+          vcpkg install --classic opus:x64-windows-static libyuv:x64-windows-static libvpx:x64-windows-static aom:x64-windows-static ffmpeg:x64-windows-static pkgconf:x64-windows-static
 
-      - name: Build RustDesk & Zip Windows 32 Package
+      - name: Build RustDesk & Zip Windows Package
         shell: pwsh
         env:
           VCPKG_ROOT: "C:/vcpkg"
-          VCPKG_DEFAULT_TRIPLET: "x86-windows-static"
-          CARGO_BUILD_TARGET: "i686-pc-windows-msvc"
+          VCPKG_DEFAULT_TRIPLET: "x64-windows-static"
         run: |
           python3 .\build.py --portable --flutter --skip-portable-pack
-          Compress-Archive -Path ./flutter/build/windows/x86/runner/Release/* -DestinationPath ./Sunev-Windows-32bits.zip
+          Compress-Archive -Path ./flutter/build/windows/x64/runner/Release/* -DestinationPath ./Sunev-Windows-64bits.zip
 
-      - name: Publish Windows 32 Release
+      - name: Publish Windows 64 Release
         uses: softprops/action-gh-release@v1
         with:
           tag_name: "v1.0.0-build"
-          files: Sunev-Windows-32bits.zip
-# Set CARGO_BUILD_TARGET for 32-bit Windows build
+          files: Sunev-Windows-64bits.zip
+# Clean workflow focused on stable Windows 64-bit build
