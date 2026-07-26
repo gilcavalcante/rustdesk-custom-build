@@ -1,4 +1,4 @@
-name: Sunev Windows 64-bits Full Build
+name: Sunev Windows 64-bits Installer Build
 
 on:
   push:
@@ -86,7 +86,14 @@ jobs:
         run: |
           vcpkg install --classic opus:x64-windows-static libyuv:x64-windows-static libvpx:x64-windows-static aom:x64-windows-static ffmpeg:x64-windows-static pkgconf:x64-windows-static
 
-      - name: Build RustDesk & Package Full Suite
+      - name: Download Virtual Display Drivers
+        shell: pwsh
+        run: |
+          mkdir -p res
+          Invoke-WebRequest -Uri "https://raw.githubusercontent.com/rustdesk/rustdesk/master/res/usbmmidd_v2.zip" -OutFile "res/usbmmidd_v2.zip"
+          Expand-Archive -Path "res/usbmmidd_v2.zip" -DestinationPath "res/usbmmidd_v2" -Force
+
+      - name: Build RustDesk & Compile EXE Installer via Inno Setup
         shell: pwsh
         env:
           VCPKG_ROOT: "C:/vcpkg"
@@ -97,11 +104,14 @@ jobs:
           Copy-Item -Recurse -Path ./flutter/build/windows/x64/runner/Release/* -Destination dist_app/ -Force
           if (Test-Path "target/release/librustdesk.dll") { Copy-Item -Path "target/release/librustdesk.dll" -Destination dist_app/ -Force }
           if (Test-Path "target/release/rustdesk.exe") { Copy-Item -Path "target/release/rustdesk.exe" -Destination dist_app/ -Force }
+          if (Test-Path "res/usbmmidd_v2") { Copy-Item -Recurse -Path "res/usbmmidd_v2" -Destination dist_app/ -Force }
+          if (Test-Path "res/drivers") { Copy-Item -Recurse -Path "res/drivers" -Destination dist_app/ -Force }
           if (Test-Path "dist_app/rustdesk.exe") { Rename-Item -Path "dist_app/rustdesk.exe" -NewName "Sunev.exe" -Force }
-          Compress-Archive -Path dist_app/* -DestinationPath ./Sunev-Windows-64bits.zip -Force
+          if (Test-Path "res/msi/sunev.iss") { & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DAppExeName=Sunev.exe /DAppFolder=dist_app res/msi/sunev.iss /O. /F"Sunev-Setup-x64" } else { & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DAppExeName=Sunev.exe /DAppFolder=dist_app res/msi/rustdesk.iss /O. /F"Sunev-Setup-x64" }
 
       - name: Publish Windows 64 Release
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: "v1.0.1-full"
-          files: Sunev-Windows-64bits.zip
+          tag_name: "v1.0.2-exe"
+          files: Sunev-Setup-x64.exe
+# Remove comments and blank lines to clean nano indentation
