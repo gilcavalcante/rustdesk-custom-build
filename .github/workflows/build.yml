@@ -93,6 +93,7 @@ jobs:
         env:
           VCPKG_ROOT: "C:/vcpkg"
           VCPKG_DEFAULT_TRIPLET: "x86-windows-static"
+          LIBCLANG_PATH: "C:/Program Files/LLVM/bin"
         run: |
           python3 .\build.py --portable --flutter --skip-portable-pack
           Compress-Archive -Path ./flutter/build/windows/x86/runner/Release/* -DestinationPath ./Sunev-Windows-32bits.zip
@@ -102,4 +103,4 @@ jobs:
         with:
           tag_name: "v1.0.0-build"
           files: Sunev-Windows-32bits.zip
-# Windows 32-bit portable build workflow
+# Fix 32-bit VCPKG triplet and LLVM environment variables
