@@ -21,7 +21,7 @@ jobs:
       - name: Install System Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y gcc-multilib g++-multilib clang libclang-dev ninja-build cmake pkg-config curl unzip
+          sudo apt-get install -y gcc-multilib g++-multilib clang libclang-dev ninja-build cmake pkg-config git
 
       - name: Install Java
         uses: actions/setup-java@v3
@@ -37,17 +37,18 @@ jobs:
           echo "ANDROID_NDK_ROOT=$NDK_PATH" >> $GITHUB_ENV
           echo "ANDROID_NDK=$NDK_PATH" >> $GITHUB_ENV
 
-      - name: Download RustDesk Android Native Prebuilt Libs (.a)
+      - name: Clone Official RustDesk Android Native Assets
         run: |
-          mkdir -p $HOME/vcpkg/installed
-          cd $HOME/vcpkg/installed
-          curl -L -o android_deps.zip https://github.com/rustdesk/rustdesk-assets/releases/download/static/android_deps.zip || curl -L -o android_deps.zip https://raw.githubusercontent.com/rustdesk/rustdesk-assets/main/android_deps.zip || true
-          if [ -f android_deps.zip ] && [ $(stat -c%s "android_deps.zip") -gt 1000 ]; then
-            unzip -o -q android_deps.zip -d .
-          else
-            # Backup: Usar vcpkg oficial sem passar pelo manifest
-            echo "Fallback to clean vcpkg setup..."
+          mkdir -p $HOME/vcpkg
+          git clone --depth=1 https://github.com/rustdesk/rustdesk-assets.0.git $HOME/rustdesk-assets || git clone --depth=1 https://github.com/rustdesk/rustdesk-assets.git $HOME/rustdesk-assets || true
+          
+          # Se a pasta android_deps ou installed existir, vincula pro VCPKG
+          if [ -d "$HOME/rustdesk-assets/android_deps" ]; then
+            cp -r $HOME/rustdesk-assets/android_deps/* $HOME/vcpkg/
+          elif [ -d "$HOME/rustdesk-assets/installed" ]; then
+            cp -r $HOME/rustdesk-assets/installed $HOME/vcpkg/
           fi
+          
           echo "VCPKG_ROOT=$HOME/vcpkg" >> $GITHUB_ENV
 
       - name: Install Rust & Android Targets
