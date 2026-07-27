@@ -23,6 +23,10 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
+      - name: Install NDK & Android SDK Tools
+        run: |
+          sudo $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --install "ndk;25.2.9519653"
+
       - name: Install Rust & Android Targets
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -44,7 +48,12 @@ jobs:
           cd flutter && flutter pub get
           ~/.cargo/bin/flutter_rust_bridge_codegen --rust-input ../src/flutter_ffi.rs --dart-output ./lib/generated_bridge.dart --c-output ./macos/Runner/bridge_generated.h --skip-deps-check
 
-      - name: Build Android APK
+      - name: Build Native Rust Libraries (.so)
+        run: |
+          export ANDROID_NDK_HOME=$ANDROID_HOME/ndk/25.2.9519653
+          cargo ndk -t aarch64-linux-android -t armv7-linux-androideabi -t x86_64-linux-android -o ./flutter/android/app/src/main/jniLibs build --release
+
+      - name: Build Android APK Full
         run: |
           cd flutter
           flutter build apk --release
@@ -53,7 +62,6 @@ jobs:
         run: |
           mkdir -p dist_android
           cp flutter/build/app/outputs/flutter-apk/app-release.apk dist_android/Sunev-Android-Universal.apk
-          ls -la dist_android/
 
       - name: Upload APK as Job Artifact
         uses: actions/upload-artifact@v4
