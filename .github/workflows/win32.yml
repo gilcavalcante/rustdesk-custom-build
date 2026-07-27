@@ -1,4 +1,4 @@
-name: Build Windows 32-bits Portable
+name: Build Windows 32-bits Portable EXCLUSIVO
 
 on:
   push:
@@ -48,7 +48,7 @@ jobs:
             ./flutter/lib/generated_bridge.dart
             ./flutter/lib/generated_bridge.freezed.dart
 
-  build-win32:
+  build-win32-portable:
     needs: [generate-bridge]
     runs-on: windows-2022
     steps:
@@ -67,10 +67,10 @@ jobs:
         with:
           version: "15.0.6"
 
-      - name: Install Rust 32-bit
+      - name: Install Rust 32-bit (i686)
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: "1.75"
+          toolchain: "1.75.0"
           targets: i686-pc-windows-msvc
           components: rustfmt
 
@@ -79,30 +79,40 @@ jobs:
         with:
           flutter-version: "3.24.5"
 
-      - name: Setup VCPKG 32-bit
+      - name: Setup VCPKG 32-bit Static
         shell: pwsh
         run: |
           vcpkg install --classic opus:x86-windows-static libyuv:x86-windows-static libvpx:x86-windows-static aom:x86-windows-static ffmpeg:x86-windows-static pkgconf:x86-windows-static
 
-      - name: Build Win32 Portable
+      - name: Build Win32 Binary & Flutter
         shell: pwsh
         env:
           VCPKG_ROOT: "C:/vcpkg"
           VCPKG_DEFAULT_TRIPLET: "x86-windows-static"
           CARGO_BUILD_TARGET: "i686-pc-windows-msvc"
         run: |
+          rustup default 1.75.0-i686-pc-windows-msvc
           python3 .\build.py --portable --flutter --skip-portable-pack
           New-Item -ItemType Directory -Force -Path dist_win32
-          Copy-Item -Recurse -Path ./flutter/build/windows/x86/runner/Release/* -Destination dist_win32/ -Force
+          if (Test-Path "flutter/build/windows/x86/runner/Release") {
+            Copy-Item -Recurse -Path ./flutter/build/windows/x86/runner/Release/* -Destination dist_win32/ -Force
+          } elseif (Test-Path "flutter/build/windows/runner/Release") {
+            Copy-Item -Recurse -Path ./flutter/build/windows/runner/Release/* -Destination dist_win32/ -Force
+          }
           if (Test-Path "target/i686-pc-windows-msvc/release/librustdesk.dll") { Copy-Item -Path "target/i686-pc-windows-msvc/release/librustdesk.dll" -Destination dist_win32/ -Force }
-          elseif (Test-Path "target/release/librustdesk.dll") { Copy-Item -Path "target/release/librustdesk.dll" -Destination dist_win32/ -Force }
           if (Test-Path "target/i686-pc-windows-msvc/release/rustdesk.exe") { Copy-Item -Path "target/i686-pc-windows-msvc/release/rustdesk.exe" -Destination dist_win32/ -Force }
-          elseif (Test-Path "target/release/rustdesk.exe") { Copy-Item -Path "target/release/rustdesk.exe" -Destination dist_win32/ -Force }
           if (Test-Path "dist_win32/rustdesk.exe") { Rename-Item -Path "dist_win32/rustdesk.exe" -NewName "Sunev.exe" -Force }
           Compress-Archive -Path dist_win32/* -DestinationPath ./Sunev-Windows-32bits-Portable.zip -Force
 
+      - name: Upload Win32 Zip as Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Sunev-Windows-32bits-Portable
+          path: ./Sunev-Windows-32bits-Portable.zip
+
       - name: Publish Win32 Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: "v1.0.0-win32"
+          name: "Sunev Windows 32-bits Portable v1.0.0"
           files: Sunev-Windows-32bits-Portable.zip
