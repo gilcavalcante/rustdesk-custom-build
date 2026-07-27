@@ -21,7 +21,7 @@ jobs:
       - name: Install System Dependencies & Multilib
         run: |
           sudo apt-get update
-          sudo apt-get install -y gcc-multilib g++-multilib clang libclang-dev
+          sudo apt-get install -y gcc-multilib g++-multilib clang libclang-dev ninja-build cmake
 
       - name: Install Java
         uses: actions/setup-java@v3
@@ -40,11 +40,17 @@ jobs:
           components: rustfmt
           targets: 'aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android'
 
-      - name: Setup VCPKG for Android
+      - name: Setup VCPKG & Install Opus for Android
         run: |
-          cd /usr/local/share/vcpkg || cd $HOME/vcpkg || git clone https://github.com/microsoft/vcpkg.git $HOME/vcpkg
+          if [ ! -d "$HOME/vcpkg" ]; then
+            git clone https://github.com/microsoft/vcpkg.git $HOME/vcpkg
+            $HOME/vcpkg/bootstrap-vcpkg.sh
+          fi
           export VCPKG_ROOT=$HOME/vcpkg
           echo "VCPKG_ROOT=$VCPKG_ROOT" >> $GITHUB_ENV
+          export ANDROID_NDK_HOME=$ANDROID_HOME/ndk/25.2.9519653
+          
+          $HOME/vcpkg/vcpkg install opus:arm64-android opus:arm-android opus:x86_64-android
 
       - name: Install Cargo NDK
         run: cargo install cargo-ndk --version 3.4.0
