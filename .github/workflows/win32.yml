@@ -1,9 +1,10 @@
-name: Build Windows 32-bits Portable EXCLUSIVO
+name: Build Windows 32-bits Portable
 
 on:
-  push:
-    branches: [ "main", "master" ]
   workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/win32.yml'
 
 permissions:
   contents: write
