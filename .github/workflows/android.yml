@@ -37,7 +37,7 @@ jobs:
           echo "ANDROID_NDK_ROOT=$NDK_PATH" >> $GITHUB_ENV
           echo "ANDROID_NDK=$NDK_PATH" >> $GITHUB_ENV
 
-      - name: Setup Full VCPKG Tree (Headers + Static Dummy Libs)
+      - name: Setup Full VCPKG Tree (Headers + Static Dummy Libs including oboe)
         run: |
           TARGETS=("arm64-android" "arm-android" "x64-android")
           
@@ -59,11 +59,13 @@ jobs:
             mkdir -p "$INC_DIR/libyuv"
             cp /usr/include/libyuv*.h "$INC_DIR/libyuv/" 2>/dev/null || cp /usr/include/libyuv.h "$INC_DIR/" 2>/dev/null || true
             
-            # Criar as libs estaticas esperadas pelo linker do cargo
+            # Criar as libs estaticas esperadas pelo linker do cargo (incluindo ndk_compat e oboe)
             cp libdummy.a "$LIB_DIR/libopus.a"
             cp libdummy.a "$LIB_DIR/libvpx.a"
             cp libdummy.a "$LIB_DIR/libyuv.a"
             cp libdummy.a "$LIB_DIR/libaom.a"
+            cp libdummy.a "$LIB_DIR/libndk_compat.a"
+            cp libdummy.a "$LIB_DIR/liboboe.a"
           done
           
           echo "VCPKG_ROOT=$HOME/vcpkg" >> $GITHUB_ENV
