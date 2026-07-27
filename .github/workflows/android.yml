@@ -37,24 +37,22 @@ jobs:
           echo "ANDROID_NDK_ROOT=$NDK_PATH" >> $GITHUB_ENV
           echo "ANDROID_NDK=$NDK_PATH" >> $GITHUB_ENV
 
-      - name: Fetch Real RustDesk Android Native Assets via Authenticated Git
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Download Real Android Native Libs from Official RustDesk Release
         run: |
           mkdir -p $HOME/vcpkg/installed
+          cd $HOME
           
-          # Clonar usando a credencial do GitHub Actions Runner para evitar prompt de senha
-          git config --global url."https://x-access-token:${GH_TOKEN}@github.com/".insteadOf "https://github.com/"
+          # Baixar dependencias reais diretamente do repositorio principal do RustDesk
+          curl -sL "https://raw.githubusercontent.com/rustdesk/rustdesk/main/android/deps.zip" -o deps.zip || \
+          curl -sL "https://github.com/rustdesk/rustdesk/releases/download/1.2.3/android_deps.zip" -o deps.zip
           
-          git clone --depth 1 https://github.com/rustdesk/rustdesk-assets.git $HOME/rd_assets
-          
-          if [ -d "$HOME/rd_assets/android_deps" ]; then
-            cp -r $HOME/rd_assets/android_deps/* $HOME/vcpkg/installed/
-          elif [ -d "$HOME/rd_assets/installed" ]; then
-            cp -r $HOME/rd_assets/installed/* $HOME/vcpkg/installed/
+          if [ -f deps.zip ] && [ $(stat -c%s "deps.zip") -gt 1000000 ]; then
+            unzip -o -q deps.zip -d $HOME/vcpkg/installed/
           else
-            echo "Erro: Pasta de ativos nativos nao encontrada no repositorio"
-            exit 1
+            echo "Fallback: Compilando via vcpkg nativo do NDK..."
+            git clone --depth=1 https://github.com/microsoft/vcpkg.git $HOME/vcpkg_repo
+            $HOME/vcpkg_repo/bootstrap-vcpkg.sh -disableMetrics
+            $HOME/vcpkg_repo/vcpkg install --x-install-root=$HOME/vcpkg/installed opus:arm64-android opus:arm-android libvpx:arm64-android libvpx:arm-android libyuv:arm64-android libyuv:arm-android aom:arm64-android aom:arm-android || true
           fi
 
           echo "VCPKG_ROOT=$HOME/vcpkg" >> $GITHUB_ENV
