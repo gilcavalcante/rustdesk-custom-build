@@ -50,7 +50,7 @@ jobs:
           echo "VCPKG_ROOT=$VCPKG_ROOT" >> $GITHUB_ENV
           export ANDROID_NDK_HOME=$ANDROID_HOME/ndk/25.2.9519653
           
-          $HOME/vcpkg/vcpkg install opus:arm64-android opus:arm-android opus:x86_64-android
+          $HOME/vcpkg/vcpkg install --classic opus:arm64-android opus:arm-android opus:x86_64-android
 
       - name: Install Cargo NDK
         run: cargo install cargo-ndk --version 3.4.0
