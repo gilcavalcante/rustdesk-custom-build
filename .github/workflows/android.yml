@@ -35,6 +35,12 @@ jobs:
           components: rustfmt
           targets: 'aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android'
 
+      - name: Setup VCPKG for Android
+        run: |
+          cd /usr/local/share/vcpkg || cd $HOME/vcpkg || git clone https://github.com/microsoft/vcpkg.git $HOME/vcpkg
+          export VCPKG_ROOT=$HOME/vcpkg
+          echo "VCPKG_ROOT=$VCPKG_ROOT" >> $GITHUB_ENV
+
       - name: Install Cargo NDK
         run: cargo install cargo-ndk --version 3.4.0
 
