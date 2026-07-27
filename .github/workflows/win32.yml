@@ -63,11 +63,6 @@ jobs:
           name: bridge-win32
           path: ./
 
-      - name: Install LLVM via Choco (x86)
-        shell: pwsh
-        run: |
-          choco install llvm --version=15.0.6 --force -y --no-progress --additional-arguments="GLOBAL=1"
-
       - name: Install Rust 32-bit (i686)
         uses: dtolnay/rust-toolchain@stable
         with:
