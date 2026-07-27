@@ -29,8 +29,12 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Install NDK & Set Environment Variables
+      - name: Setup Dummy VCPKG Root & NDK Variables
         run: |
+          mkdir -p $HOME/vcpkg
+          echo "VCPKG_ROOT=$HOME/vcpkg" >> $GITHUB_ENV
+          echo "VCPKG_FORCE_SYSTEM_BINARIES=1" >> $GITHUB_ENV
+          
           sudo $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --install "ndk;25.2.9519653"
           NDK_PATH="$ANDROID_HOME/ndk/25.2.9519653"
           echo "ANDROID_NDK_HOME=$NDK_PATH" >> $GITHUB_ENV
