@@ -21,7 +21,7 @@ jobs:
       - name: Install System Dependencies & Multilib
         run: |
           sudo apt-get update
-          sudo apt-get install -y gcc-multilib g++-multilib clang libclang-dev ninja-build cmake pkg-config libopus-dev
+          sudo apt-get install -y gcc-multilib g++-multilib clang libclang-dev ninja-build cmake pkg-config
 
       - name: Install Java
         uses: actions/setup-java@v3
@@ -29,12 +29,8 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Setup Dummy VCPKG Root & NDK Variables
+      - name: Install NDK & Set Environment Variables
         run: |
-          mkdir -p $HOME/vcpkg
-          echo "VCPKG_ROOT=$HOME/vcpkg" >> $GITHUB_ENV
-          echo "VCPKG_FORCE_SYSTEM_BINARIES=1" >> $GITHUB_ENV
-          
           sudo $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --install "ndk;25.2.9519653"
           NDK_PATH="$ANDROID_HOME/ndk/25.2.9519653"
           echo "ANDROID_NDK_HOME=$NDK_PATH" >> $GITHUB_ENV
@@ -47,6 +43,15 @@ jobs:
           toolchain: 'stable'
           components: rustfmt
           targets: 'aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android'
+
+      - name: Setup VCPKG & Install Media Dependencies for Android
+        run: |
+          git clone https://github.com/microsoft/vcpkg.git $HOME/vcpkg
+          $HOME/vcpkg/bootstrap-vcpkg.sh -disableMetrics
+          echo "VCPKG_ROOT=$HOME/vcpkg" >> $GITHUB_ENV
+          
+          # Instalar dependencias nativas sem checar compiler hash
+          $HOME/vcpkg/vcpkg install --classic opus:arm64-android opus:arm-android opus:x64-android libvpx:arm64-android libvpx:arm-android libvpx:x64-android libyuv:arm64-android libyuv:arm-android libyuv:x64-android || true
 
       - name: Install Cargo NDK
         run: cargo install cargo-ndk --version 3.4.0
