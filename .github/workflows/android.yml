@@ -18,10 +18,10 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Install System Dependencies
+      - name: Install System Dependencies & Media Headers
         run: |
           sudo apt-get update
-          sudo apt-get install -y gcc-multilib g++-multilib clang libclang-dev ninja-build cmake pkg-config curl unzip
+          sudo apt-get install -y gcc-multilib g++-multilib clang libclang-dev ninja-build cmake pkg-config libvpx-dev libopus-dev libyuv-dev
 
       - name: Install Java
         uses: actions/setup-java@v3
@@ -37,12 +37,22 @@ jobs:
           echo "ANDROID_NDK_ROOT=$NDK_PATH" >> $GITHUB_ENV
           echo "ANDROID_NDK=$NDK_PATH" >> $GITHUB_ENV
 
-      - name: Download Prebuilt RustDesk Android Dependencies
+      - name: Setup System Headers for Android Cargo Build
         run: |
-          mkdir -p $HOME/vcpkg/installed
-          cd $HOME/vcpkg/installed
-          curl -L -o android_deps.zip https://github.com/rustdesk/rustdesk-assets/releases/download/v1.1.9/android_deps.zip || curl -L -o android_deps.zip https://github.com/rustdesk/rustdesk-assets/releases/download/v1.0.0/android_deps.zip
-          unzip -o -q android_deps.zip -d .
+          mkdir -p $HOME/android_headers/include
+          cp -r /usr/include/vpx $HOME/android_headers/include/ 2>/dev/null || true
+          cp -r /usr/include/opus $HOME/android_headers/include/ 2>/dev/null || true
+          cp -r /usr/include/libyuv* $HOME/android_headers/include/ 2>/dev/null || true
+          
+          # Criar estrutura simulada do VCPKG apontando pros headers do Linux
+          mkdir -p $HOME/vcpkg/installed/arm64-android/include
+          mkdir -p $HOME/vcpkg/installed/arm-android/include
+          mkdir -p $HOME/vcpkg/installed/x64-android/include
+          
+          cp -r $HOME/android_headers/include/* $HOME/vcpkg/installed/arm64-android/include/
+          cp -r $HOME/android_headers/include/* $HOME/vcpkg/installed/arm-android/include/
+          cp -r $HOME/android_headers/include/* $HOME/vcpkg/installed/x64-android/include/
+          
           echo "VCPKG_ROOT=$HOME/vcpkg" >> $GITHUB_ENV
 
       - name: Install Rust & Android Targets
