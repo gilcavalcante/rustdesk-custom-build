@@ -21,7 +21,7 @@ jobs:
       - name: Install System Dependencies & Multilib
         run: |
           sudo apt-get update
-          sudo apt-get install -y gcc-multilib g++-multilib clang libclang-dev ninja-build cmake
+          sudo apt-get install -y gcc-multilib g++-multilib clang libclang-dev ninja-build cmake pkg-config libopus-dev
 
       - name: Install Java
         uses: actions/setup-java@v3
@@ -44,17 +44,6 @@ jobs:
           components: rustfmt
           targets: 'aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android'
 
-      - name: Setup VCPKG & Install Opus for Android
-        run: |
-          if [ ! -d "$HOME/vcpkg" ]; then
-            git clone https://github.com/microsoft/vcpkg.git $HOME/vcpkg
-            $HOME/vcpkg/bootstrap-vcpkg.sh
-          fi
-          export VCPKG_ROOT=$HOME/vcpkg
-          echo "VCPKG_ROOT=$VCPKG_ROOT" >> $GITHUB_ENV
-          
-          $HOME/vcpkg/vcpkg install --classic opus:arm64-android opus:arm-android opus:x64-android
-
       - name: Install Cargo NDK
         run: cargo install cargo-ndk --version 3.4.0
 
@@ -69,8 +58,9 @@ jobs:
           cd flutter && flutter pub get
           ~/.cargo/bin/flutter_rust_bridge_codegen --rust-input ../src/flutter_ffi.rs --dart-output ./lib/generated_bridge.dart --c-output ./macos/Runner/bridge_generated.h --skip-deps-check
 
-      - name: Build Native Rust Libs (.so)
+      - name: Build Native Rust Libs (.so) via Cargo NDK
         run: |
+          export ANDROID_NDK_HOME=$ANDROID_HOME/ndk/25.2.9519653
           cargo ndk -t aarch64-linux-android -t armv7-linux-androideabi -t x86_64-linux-android -o ./flutter/android/app/src/main/jniLibs build --release
 
       - name: Build Android APK
