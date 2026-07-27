@@ -100,7 +100,7 @@ jobs:
           # 1. Compilar lib nativa e binario Rust
           cargo build --release --target i686-pc-windows-msvc --features "flutter"
           
-          # 2. Copiar as DLLs/EXEs gerados pelo Cargo para a pasta do Flutter antes do build
+          # 2. Copiar as DLLs geradas para a pasta do Flutter
           if (Test-Path "target/i686-pc-windows-msvc/release/librustdesk.dll") {
             Copy-Item -Path "target/i686-pc-windows-msvc/release/librustdesk.dll" -Destination "flutter/" -Force
           }
@@ -111,17 +111,32 @@ jobs:
           flutter build windows --release || true
           cd ..
           
-          # 4. Empacotar arquivos finais na pasta dist_win32
+          # 4. Copiar APENAS o resultado final limpo do Release do Flutter
           New-Item -ItemType Directory -Force -Path dist_win32
           
-          Get-ChildItem -Path "flutter/build/windows" -Recurse -Filter "Release" | ForEach-Object {
-            Copy-Item -Recurse -Path "$($_.FullName)/*" -Destination dist_win32/ -Force
+          $FLUTTER_RELEASE_DIR = "flutter/build/windows/runner/Release"
+          if (-not (Test-Path $FLUTTER_RELEASE_DIR)) {
+            $FLUTTER_RELEASE_DIR = "flutter/build/windows/x86/runner/Release"
           }
           
-          if (Test-Path "target/i686-pc-windows-msvc/release/librustdesk.dll") { Copy-Item -Path "target/i686-pc-windows-msvc/release/librustdesk.dll" -Destination dist_win32/ -Force }
-          if (Test-Path "target/i686-pc-windows-msvc/release/rustdesk.exe") { Copy-Item -Path "target/i686-pc-windows-msvc/release/rustdesk.exe" -Destination dist_win32/ -Force }
+          if (Test-Path $FLUTTER_RELEASE_DIR) {
+            Copy-Item -Recurse -Path "$FLUTTER_RELEASE_DIR/*" -Destination dist_win32/ -Force
+          }
           
-          if (Test-Path "dist_win32/rustdesk.exe") { Rename-Item -Path "dist_win32/rustdesk.exe" -NewName "Sunev.exe" -Force }
+          # Copiar a librustdesk.dll e o executavel Rust se aplicavel
+          if (Test-Path "target/i686-pc-windows-msvc/release/librustdesk.dll") { 
+            Copy-Item -Path "target/i686-pc-windows-msvc/release/librustdesk.dll" -Destination dist_win32/ -Force 
+          }
+          
+          # Renomear o executavel para Sunev.exe
+          if (Test-Path "dist_win32/rustdesk.exe") { 
+            Rename-Item -Path "dist_win32/rustdesk.exe" -NewName "Sunev.exe" -Force 
+          } elseif (Test-Path "dist_win32/flutter_hbb.exe") {
+            Rename-Item -Path "dist_win32/flutter_hbb.exe" -NewName "Sunev.exe" -Force
+          }
+          
+          # Limpar eventuais arquivos .obj ou .lib que tenham escapado
+          Get-ChildItem -Path dist_win32 -Include *.obj,*.lib,*.exp,*.tlog,*.recipe -Recurse | Remove-Item -Force
           
           Compress-Archive -Path dist_win32/* -DestinationPath ./Sunev-Windows-32bits-Portable.zip -Force
 
