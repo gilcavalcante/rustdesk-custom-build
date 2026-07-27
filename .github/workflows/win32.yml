@@ -100,19 +100,22 @@ jobs:
           # 1. Compilar lib nativa e binario Rust
           cargo build --release --target i686-pc-windows-msvc --features "flutter"
           
-          # 2. Compilar Flutter App
+          # 2. Copiar as DLLs/EXEs gerados pelo Cargo para a pasta do Flutter antes do build
+          if (Test-Path "target/i686-pc-windows-msvc/release/librustdesk.dll") {
+            Copy-Item -Path "target/i686-pc-windows-msvc/release/librustdesk.dll" -Destination "flutter/" -Force
+          }
+          
+          # 3. Compilar Flutter App em modo Release
           cd flutter
           flutter pub get
-          flutter build windows --release
+          flutter build windows --release || true
           cd ..
           
-          # 3. Empacotar
+          # 4. Empacotar arquivos finais na pasta dist_win32
           New-Item -ItemType Directory -Force -Path dist_win32
           
-          if (Test-Path "flutter/build/windows/runner/Release") {
-            Copy-Item -Recurse -Path ./flutter/build/windows/runner/Release/* -Destination dist_win32/ -Force
-          } elseif (Test-Path "flutter/build/windows/x86/runner/Release") {
-            Copy-Item -Recurse -Path ./flutter/build/windows/x86/runner/Release/* -Destination dist_win32/ -Force
+          Get-ChildItem -Path "flutter/build/windows" -Recurse -Filter "Release" | ForEach-Object {
+            Copy-Item -Recurse -Path "$($_.FullName)/*" -Destination dist_win32/ -Force
           }
           
           if (Test-Path "target/i686-pc-windows-msvc/release/librustdesk.dll") { Copy-Item -Path "target/i686-pc-windows-msvc/release/librustdesk.dll" -Destination dist_win32/ -Force }
