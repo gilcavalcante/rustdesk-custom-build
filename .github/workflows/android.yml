@@ -52,9 +52,10 @@ jobs:
       - name: Prepare APK Artifact
         run: |
           mkdir -p dist_android
-          find flutter/build/app/outputs/ -name "*.apk" -exec cp {} dist_android/Sunev-Android-Universal.apk \;
+          cp flutter/build/app/outputs/flutter-apk/app-release.apk dist_android/Sunev-Android-Universal.apk
+          ls -la dist_android/
 
-      - name: Upload APK as Job Artifact (Garantia de Download)
+      - name: Upload APK as Job Artifact
         uses: actions/upload-artifact@v4
         with:
           name: Sunev-Android-Universal-APK
