@@ -21,7 +21,7 @@ jobs:
       - name: Install System Dependencies & Media Headers
         run: |
           sudo apt-get update
-          sudo apt-get install -y gcc-multilib g++-multilib clang libclang-dev ninja-build cmake pkg-config libvpx-dev libopus-dev libyuv-dev
+          sudo apt-get install -y gcc-multilib g++-multilib clang libclang-dev ninja-build cmake pkg-config libvpx-dev libopus-dev libyuv-dev libaom-dev
 
       - name: Install Java
         uses: actions/setup-java@v3
@@ -43,6 +43,7 @@ jobs:
           cp -r /usr/include/vpx $HOME/android_headers/include/ 2>/dev/null || true
           cp -r /usr/include/opus $HOME/android_headers/include/ 2>/dev/null || true
           cp -r /usr/include/libyuv* $HOME/android_headers/include/ 2>/dev/null || true
+          cp -r /usr/include/aom $HOME/android_headers/include/ 2>/dev/null || true
           
           # Criar estrutura simulada do VCPKG apontando pros headers do Linux
           mkdir -p $HOME/vcpkg/installed/arm64-android/include
