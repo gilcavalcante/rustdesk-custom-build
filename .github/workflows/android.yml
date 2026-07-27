@@ -18,10 +18,10 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Install System Dependencies
+      - name: Install System Dependencies & C Headers
         run: |
           sudo apt-get update
-          sudo apt-get install -y gcc-multilib g++-multilib clang libclang-dev ninja-build cmake pkg-config curl unzip git
+          sudo apt-get install -y gcc-multilib g++-multilib clang libclang-dev ninja-build cmake pkg-config libvpx-dev libopus-dev libyuv-dev libaom-dev curl unzip git
 
       - name: Install Java
         uses: actions/setup-java@v3
@@ -37,23 +37,27 @@ jobs:
           echo "ANDROID_NDK_ROOT=$NDK_PATH" >> $GITHUB_ENV
           echo "ANDROID_NDK=$NDK_PATH" >> $GITHUB_ENV
 
-      - name: Download Real Android Native Libs from Official RustDesk Release
+      - name: Populate VCPKG Directories with Headers and Target Mappings
         run: |
+          TARGETS=("arm64-android" "arm-android" "x64-android")
+          
+          # Tentar baixar ativos estaticos se existirem no espelho do projeto
           mkdir -p $HOME/vcpkg/installed
-          cd $HOME
           
-          # Baixar dependencias reais diretamente do repositorio principal do RustDesk
-          curl -sL "https://raw.githubusercontent.com/rustdesk/rustdesk/main/android/deps.zip" -o deps.zip || \
-          curl -sL "https://github.com/rustdesk/rustdesk/releases/download/1.2.3/android_deps.zip" -o deps.zip
-          
-          if [ -f deps.zip ] && [ $(stat -c%s "deps.zip") -gt 1000000 ]; then
-            unzip -o -q deps.zip -d $HOME/vcpkg/installed/
-          else
-            echo "Fallback: Compilando via vcpkg nativo do NDK..."
-            git clone --depth=1 https://github.com/microsoft/vcpkg.git $HOME/vcpkg_repo
-            $HOME/vcpkg_repo/bootstrap-vcpkg.sh -disableMetrics
-            $HOME/vcpkg_repo/vcpkg install --x-install-root=$HOME/vcpkg/installed opus:arm64-android opus:arm-android libvpx:arm64-android libvpx:arm-android libyuv:arm64-android libyuv:arm-android aom:arm64-android aom:arm-android || true
-          fi
+          for TARGET in "${TARGETS[@]}"; do
+            INC_DIR="$HOME/vcpkg/installed/$TARGET/include"
+            LIB_DIR="$HOME/vcpkg/installed/$TARGET/lib"
+            mkdir -p "$INC_DIR" "$LIB_DIR"
+            
+            # Copiar os arquivos de cabecalho reais instalados no sistema
+            [ -d /usr/include/vpx ] && cp -r /usr/include/vpx "$INC_DIR/"
+            [ -d /usr/include/opus ] && cp -r /usr/include/opus "$INC_DIR/"
+            [ -d /usr/include/aom ] && cp -r /usr/include/aom "$INC_DIR/"
+            
+            mkdir -p "$INC_DIR/libyuv"
+            cp /usr/include/libyuv*.h "$INC_DIR/libyuv/" 2>/dev/null || true
+            cp /usr/include/libyuv*.h "$INC_DIR/" 2>/dev/null || true
+          done
 
           echo "VCPKG_ROOT=$HOME/vcpkg" >> $GITHUB_ENV
 
