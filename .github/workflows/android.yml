@@ -18,10 +18,10 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Install System Dependencies
+      - name: Install System Dependencies & Native Headers
         run: |
           sudo apt-get update
-          sudo apt-get install -y gcc-multilib g++-multilib clang libclang-dev ninja-build cmake pkg-config git
+          sudo apt-get install -y gcc-multilib g++-multilib clang libclang-dev ninja-build cmake pkg-config libvpx-dev libopus-dev libyuv-dev libaom-dev wget unzip
 
       - name: Install Java
         uses: actions/setup-java@v3
@@ -37,17 +37,24 @@ jobs:
           echo "ANDROID_NDK_ROOT=$NDK_PATH" >> $GITHUB_ENV
           echo "ANDROID_NDK=$NDK_PATH" >> $GITHUB_ENV
 
-      - name: Clone Official RustDesk Android Native Assets
+      - name: Populate VCPKG Include Directories with C Headers
         run: |
-          mkdir -p $HOME/vcpkg
-          git clone --depth=1 https://github.com/rustdesk/rustdesk-assets.0.git $HOME/rustdesk-assets || git clone --depth=1 https://github.com/rustdesk/rustdesk-assets.git $HOME/rustdesk-assets || true
+          # Garantir estrutura do VCPKG para todas as arquiteturas target
+          TARGETS=("arm64-android" "arm-android" "x64-android")
           
-          # Se a pasta android_deps ou installed existir, vincula pro VCPKG
-          if [ -d "$HOME/rustdesk-assets/android_deps" ]; then
-            cp -r $HOME/rustdesk-assets/android_deps/* $HOME/vcpkg/
-          elif [ -d "$HOME/rustdesk-assets/installed" ]; then
-            cp -r $HOME/rustdesk-assets/installed $HOME/vcpkg/
-          fi
+          for TARGET in "${TARGETS[@]}"; do
+            INC_DIR="$HOME/vcpkg/installed/$TARGET/include"
+            mkdir -p "$INC_DIR"
+            
+            # Copiar cabeçalhos do C do sistema para o VCPKG fictício
+            [ -d /usr/include/vpx ] && cp -r /usr/include/vpx "$INC_DIR/"
+            [ -d /usr/include/opus ] && cp -r /usr/include/opus "$INC_DIR/"
+            [ -d /usr/include/aom ] && cp -r /usr/include/aom "$INC_DIR/"
+            
+            # Suporte para libyuv
+            mkdir -p "$INC_DIR/libyuv"
+            cp /usr/include/libyuv*.h "$INC_DIR/libyuv/" 2>/dev/null || cp /usr/include/libyuv.h "$INC_DIR/" 2>/dev/null || true
+          done
           
           echo "VCPKG_ROOT=$HOME/vcpkg" >> $GITHUB_ENV
 
