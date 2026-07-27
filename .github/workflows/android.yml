@@ -18,10 +18,10 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Install System Dependencies & Multilib
+      - name: Install System Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y gcc-multilib g++-multilib clang libclang-dev ninja-build cmake pkg-config
+          sudo apt-get install -y gcc-multilib g++-multilib clang libclang-dev ninja-build cmake pkg-config wget unzip
 
       - name: Install Java
         uses: actions/setup-java@v3
@@ -37,21 +37,20 @@ jobs:
           echo "ANDROID_NDK_ROOT=$NDK_PATH" >> $GITHUB_ENV
           echo "ANDROID_NDK=$NDK_PATH" >> $GITHUB_ENV
 
+      - name: Download Prebuilt RustDesk Android Dependencies
+        run: |
+          mkdir -p $HOME/vcpkg/installed
+          cd $HOME/vcpkg/installed
+          wget -q https://github.com/rustdesk/rustdesk-assets/releases/download/v1.0.0/android_deps.zip -O android_deps.zip || wget -q https://raw.githubusercontent.com/rustdesk/rustdesk/master/android_deps.zip -O android_deps.zip
+          unzip -q android_deps.zip -d .
+          echo "VCPKG_ROOT=$HOME/vcpkg" >> $GITHUB_ENV
+
       - name: Install Rust & Android Targets
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: 'stable'
           components: rustfmt
           targets: 'aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android'
-
-      - name: Setup VCPKG & Install Media Dependencies for Android
-        run: |
-          git clone https://github.com/microsoft/vcpkg.git $HOME/vcpkg
-          $HOME/vcpkg/bootstrap-vcpkg.sh -disableMetrics
-          echo "VCPKG_ROOT=$HOME/vcpkg" >> $GITHUB_ENV
-          
-          # Instalar dependencias nativas sem checar compiler hash
-          $HOME/vcpkg/vcpkg install --classic opus:arm64-android opus:arm-android opus:x64-android libvpx:arm64-android libvpx:arm-android libvpx:x64-android libyuv:arm64-android libyuv:arm-android libyuv:x64-android || true
 
       - name: Install Cargo NDK
         run: cargo install cargo-ndk --version 3.4.0
@@ -70,6 +69,7 @@ jobs:
       - name: Build Native Rust Libs (.so) via Cargo NDK
         run: |
           export ANDROID_NDK_HOME=$ANDROID_HOME/ndk/25.2.9519653
+          export VCPKG_ROOT=$HOME/vcpkg
           cargo ndk -t aarch64-linux-android -t armv7-linux-androideabi -t x86_64-linux-android -o ./flutter/android/app/src/main/jniLibs build --release
 
       - name: Build Android APK
