@@ -87,7 +87,7 @@ jobs:
         run: |
           vcpkg install --classic opus:x86-windows-static libyuv:x86-windows-static libvpx:x86-windows-static aom:x86-windows-static ffmpeg:x86-windows-static pkgconf:x86-windows-static
 
-      - name: Build Win32 Binary & Flutter
+      - name: Build Win32 Binary & Flutter Explicitly
         shell: pwsh
         env:
           VCPKG_ROOT: "C:/vcpkg"
@@ -96,16 +96,30 @@ jobs:
           LIBCLANG_PATH: "C:/llvm_32/bin"
         run: |
           rustup default 1.75.0-i686-pc-windows-msvc
-          python3 .\build.py --portable --flutter --skip-portable-pack
+          
+          # 1. Compilar lib nativa e binario Rust
+          cargo build --release --target i686-pc-windows-msvc --features "flutter"
+          
+          # 2. Compilar Flutter App
+          cd flutter
+          flutter pub get
+          flutter build windows --release
+          cd ..
+          
+          # 3. Empacotar
           New-Item -ItemType Directory -Force -Path dist_win32
-          if (Test-Path "flutter/build/windows/x86/runner/Release") {
-            Copy-Item -Recurse -Path ./flutter/build/windows/x86/runner/Release/* -Destination dist_win32/ -Force
-          } elseif (Test-Path "flutter/build/windows/runner/Release") {
+          
+          if (Test-Path "flutter/build/windows/runner/Release") {
             Copy-Item -Recurse -Path ./flutter/build/windows/runner/Release/* -Destination dist_win32/ -Force
+          } elseif (Test-Path "flutter/build/windows/x86/runner/Release") {
+            Copy-Item -Recurse -Path ./flutter/build/windows/x86/runner/Release/* -Destination dist_win32/ -Force
           }
+          
           if (Test-Path "target/i686-pc-windows-msvc/release/librustdesk.dll") { Copy-Item -Path "target/i686-pc-windows-msvc/release/librustdesk.dll" -Destination dist_win32/ -Force }
           if (Test-Path "target/i686-pc-windows-msvc/release/rustdesk.exe") { Copy-Item -Path "target/i686-pc-windows-msvc/release/rustdesk.exe" -Destination dist_win32/ -Force }
+          
           if (Test-Path "dist_win32/rustdesk.exe") { Rename-Item -Path "dist_win32/rustdesk.exe" -NewName "Sunev.exe" -Force }
+          
           Compress-Archive -Path dist_win32/* -DestinationPath ./Sunev-Windows-32bits-Portable.zip -Force
 
       - name: Upload Win32 Zip as Artifact
