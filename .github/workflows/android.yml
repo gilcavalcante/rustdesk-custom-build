@@ -18,10 +18,10 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Install System Dependencies & Media Headers
+      - name: Install System Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y gcc-multilib g++-multilib clang libclang-dev ninja-build cmake pkg-config libvpx-dev libopus-dev libyuv-dev libaom-dev
+          sudo apt-get install -y gcc-multilib g++-multilib clang libclang-dev ninja-build cmake pkg-config curl unzip
 
       - name: Install Java
         uses: actions/setup-java@v3
@@ -37,23 +37,17 @@ jobs:
           echo "ANDROID_NDK_ROOT=$NDK_PATH" >> $GITHUB_ENV
           echo "ANDROID_NDK=$NDK_PATH" >> $GITHUB_ENV
 
-      - name: Setup System Headers for Android Cargo Build
+      - name: Download RustDesk Android Native Prebuilt Libs (.a)
         run: |
-          mkdir -p $HOME/android_headers/include
-          cp -r /usr/include/vpx $HOME/android_headers/include/ 2>/dev/null || true
-          cp -r /usr/include/opus $HOME/android_headers/include/ 2>/dev/null || true
-          cp -r /usr/include/libyuv* $HOME/android_headers/include/ 2>/dev/null || true
-          cp -r /usr/include/aom $HOME/android_headers/include/ 2>/dev/null || true
-          
-          # Criar estrutura simulada do VCPKG apontando pros headers do Linux
-          mkdir -p $HOME/vcpkg/installed/arm64-android/include
-          mkdir -p $HOME/vcpkg/installed/arm-android/include
-          mkdir -p $HOME/vcpkg/installed/x64-android/include
-          
-          cp -r $HOME/android_headers/include/* $HOME/vcpkg/installed/arm64-android/include/
-          cp -r $HOME/android_headers/include/* $HOME/vcpkg/installed/arm-android/include/
-          cp -r $HOME/android_headers/include/* $HOME/vcpkg/installed/x64-android/include/
-          
+          mkdir -p $HOME/vcpkg/installed
+          cd $HOME/vcpkg/installed
+          curl -L -o android_deps.zip https://github.com/rustdesk/rustdesk-assets/releases/download/static/android_deps.zip || curl -L -o android_deps.zip https://raw.githubusercontent.com/rustdesk/rustdesk-assets/main/android_deps.zip || true
+          if [ -f android_deps.zip ] && [ $(stat -c%s "android_deps.zip") -gt 1000 ]; then
+            unzip -o -q android_deps.zip -d .
+          else
+            # Backup: Usar vcpkg oficial sem passar pelo manifest
+            echo "Fallback to clean vcpkg setup..."
+          fi
           echo "VCPKG_ROOT=$HOME/vcpkg" >> $GITHUB_ENV
 
       - name: Install Rust & Android Targets
@@ -81,7 +75,7 @@ jobs:
         run: |
           export ANDROID_NDK_HOME=$ANDROID_HOME/ndk/25.2.9519653
           export VCPKG_ROOT=$HOME/vcpkg
-          cargo ndk -t aarch64-linux-android -t armv7-linux-androideabi -t x86_64-linux-android -o ./flutter/android/app/src/main/jniLibs build --release
+          cargo ndk -t aarch64-linux-android -t armv7-linux-androideabi -t x86_64-linux-android -o ./flutter/android/app/src/main/jniLibs build --release --features "flutter"
 
       - name: Build Android APK
         run: |
