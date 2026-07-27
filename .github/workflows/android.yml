@@ -29,9 +29,13 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Install NDK
+      - name: Install NDK & Set Environment Variables
         run: |
           sudo $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --install "ndk;25.2.9519653"
+          NDK_PATH="$ANDROID_HOME/ndk/25.2.9519653"
+          echo "ANDROID_NDK_HOME=$NDK_PATH" >> $GITHUB_ENV
+          echo "ANDROID_NDK_ROOT=$NDK_PATH" >> $GITHUB_ENV
+          echo "ANDROID_NDK=$NDK_PATH" >> $GITHUB_ENV
 
       - name: Install Rust & Android Targets
         uses: dtolnay/rust-toolchain@stable
@@ -48,7 +52,6 @@ jobs:
           fi
           export VCPKG_ROOT=$HOME/vcpkg
           echo "VCPKG_ROOT=$VCPKG_ROOT" >> $GITHUB_ENV
-          export ANDROID_NDK_HOME=$ANDROID_HOME/ndk/25.2.9519653
           
           $HOME/vcpkg/vcpkg install --classic opus:arm64-android opus:arm-android opus:x64-android
 
@@ -68,7 +71,6 @@ jobs:
 
       - name: Build Native Rust Libs (.so)
         run: |
-          export ANDROID_NDK_HOME=$ANDROID_HOME/ndk/25.2.9519653
           cargo ndk -t aarch64-linux-android -t armv7-linux-androideabi -t x86_64-linux-android -o ./flutter/android/app/src/main/jniLibs build --release
 
       - name: Build Android APK
