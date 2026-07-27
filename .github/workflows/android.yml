@@ -18,10 +18,10 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Install System Dependencies & Native Headers
+      - name: Install System Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y gcc-multilib g++-multilib clang libclang-dev ninja-build cmake pkg-config libvpx-dev libopus-dev libyuv-dev libaom-dev wget unzip
+          sudo apt-get install -y gcc-multilib g++-multilib clang libclang-dev ninja-build cmake pkg-config wget unzip
 
       - name: Install Java
         uses: actions/setup-java@v3
@@ -37,24 +37,17 @@ jobs:
           echo "ANDROID_NDK_ROOT=$NDK_PATH" >> $GITHUB_ENV
           echo "ANDROID_NDK=$NDK_PATH" >> $GITHUB_ENV
 
-      - name: Populate VCPKG Include Directories with C Headers
+      - name: Download Official RustDesk Android Native Dependencies
         run: |
-          # Garantir estrutura do VCPKG para todas as arquiteturas target
-          TARGETS=("arm64-android" "arm-android" "x64-android")
+          mkdir -p $HOME/vcpkg_assets
+          cd $HOME/vcpkg_assets
           
-          for TARGET in "${TARGETS[@]}"; do
-            INC_DIR="$HOME/vcpkg/installed/$TARGET/include"
-            mkdir -p "$INC_DIR"
-            
-            # Copiar cabeçalhos do C do sistema para o VCPKG fictício
-            [ -d /usr/include/vpx ] && cp -r /usr/include/vpx "$INC_DIR/"
-            [ -d /usr/include/opus ] && cp -r /usr/include/opus "$INC_DIR/"
-            [ -d /usr/include/aom ] && cp -r /usr/include/aom "$INC_DIR/"
-            
-            # Suporte para libyuv
-            mkdir -p "$INC_DIR/libyuv"
-            cp /usr/include/libyuv*.h "$INC_DIR/libyuv/" 2>/dev/null || cp /usr/include/libyuv.h "$INC_DIR/" 2>/dev/null || true
-          done
+          # Baixar dependências pré-compiladas estáticas do RustDesk para Android
+          wget -q https://github.com/rustdesk/rustdesk-assets/releases/download/static/android_deps.zip -O android_deps.zip || \
+          wget -q https://github.com/rustdesk/rustdesk-assets/raw/main/android_deps.zip -O android_deps.zip
+          
+          mkdir -p $HOME/vcpkg/installed
+          unzip -o -q android_deps.zip -d $HOME/vcpkg/installed/ || true
           
           echo "VCPKG_ROOT=$HOME/vcpkg" >> $GITHUB_ENV
 
