@@ -63,6 +63,13 @@ jobs:
           name: bridge-win32
           path: ./
 
+      - name: Download & Setup LLVM 32-bit (x86)
+        shell: pwsh
+        run: |
+          Invoke-WebRequest -Uri "https://github.com/llvm/llvm-project/releases/download/llvmorg-15.0.6/LLVM-15.0.6-win32.exe" -OutFile "llvm_installer.exe"
+          7z x llvm_installer.exe -oC:\llvm_32 -y
+          echo "LIBCLANG_PATH=C:/llvm_32/bin" >> $env:GITHUB_ENV
+
       - name: Install Rust 32-bit (i686)
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -86,7 +93,7 @@ jobs:
           VCPKG_ROOT: "C:/vcpkg"
           VCPKG_DEFAULT_TRIPLET: "x86-windows-static"
           CARGO_BUILD_TARGET: "i686-pc-windows-msvc"
-          LIBCLANG_PATH: "C:/Program Files/LLVM/bin"
+          LIBCLANG_PATH: "C:/llvm_32/bin"
         run: |
           rustup default 1.75.0-i686-pc-windows-msvc
           python3 .\build.py --portable --flutter --skip-portable-pack
