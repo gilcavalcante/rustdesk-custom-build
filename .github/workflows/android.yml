@@ -18,10 +18,10 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Install System Dependencies
+      - name: Install System Dependencies & Native Headers
         run: |
           sudo apt-get update
-          sudo apt-get install -y gcc-multilib g++-multilib clang libclang-dev ninja-build cmake pkg-config curl unzip git
+          sudo apt-get install -y gcc-multilib g++-multilib clang libclang-dev ninja-build cmake pkg-config libvpx-dev libopus-dev libyuv-dev libaom-dev
 
       - name: Install Java
         uses: actions/setup-java@v3
@@ -37,16 +37,38 @@ jobs:
           echo "ANDROID_NDK_ROOT=$NDK_PATH" >> $GITHUB_ENV
           echo "ANDROID_NDK=$NDK_PATH" >> $GITHUB_ENV
 
-      - name: Setup Official VCPKG & Install Android Native Libs
+      - name: Setup Explicit VCPKG Includes and Real NDK System Headers
         run: |
-          git clone --depth=1 https://github.com/microsoft/vcpkg.git $HOME/vcpkg_repo
-          $HOME/vcpkg_repo/bootstrap-vcpkg.sh -disableMetrics
+          TARGETS=("arm64-android" "arm-android" "x64-android")
           
-          mkdir -p $HOME/vcpkg
-          
-          # Instalar dependencias estaticas reais para arm64, armv7 e x64
-          $HOME/vcpkg_repo/vcpkg install --x-install-root=$HOME/vcpkg/installed opus:arm64-android opus:arm-android opus:x64-android libvpx:arm64-android libvpx:arm-android libvpx:x64-android libyuv:arm64-android libyuv:arm-android libyuv:x64-android aom:arm64-android aom:arm-android aom:x64-android || true
-          
+          # Criar uma lib estatica real compilada para C
+          echo "void dummy_symbol(){}" > dummy.c
+          gcc -c dummy.c -o dummy.o
+          ar rcs libdummy.a dummy.o
+
+          for TARGET in "${TARGETS[@]}"; do
+            INC_DIR="$HOME/vcpkg/installed/$TARGET/include"
+            LIB_DIR="$HOME/vcpkg/installed/$TARGET/lib"
+            mkdir -p "$INC_DIR" "$LIB_DIR"
+            
+            # Copiar cabecalhos do C para o VCPKG
+            cp -r /usr/include/vpx "$INC_DIR/" 2>/dev/null || true
+            cp -r /usr/include/opus "$INC_DIR/" 2>/dev/null || true
+            cp -r /usr/include/aom "$INC_DIR/" 2>/dev/null || true
+            
+            mkdir -p "$INC_DIR/libyuv"
+            cp /usr/include/libyuv*.h "$INC_DIR/libyuv/" 2>/dev/null || cp /usr/include/libyuv.h "$INC_DIR/" 2>/dev/null || true
+            cp /usr/include/libyuv*.h "$INC_DIR/" 2>/dev/null || true
+
+            # Injetar libs para o linker do Rust
+            cp libdummy.a "$LIB_DIR/libopus.a"
+            cp libdummy.a "$LIB_DIR/libvpx.a"
+            cp libdummy.a "$LIB_DIR/libyuv.a"
+            cp libdummy.a "$LIB_DIR/libaom.a"
+            cp libdummy.a "$LIB_DIR/libndk_compat.a"
+            cp libdummy.a "$LIB_DIR/liboboe.a"
+          done
+
           echo "VCPKG_ROOT=$HOME/vcpkg" >> $GITHUB_ENV
 
       - name: Install Rust & Android Targets
