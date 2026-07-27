@@ -18,10 +18,10 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Install System Dependencies & C Headers
+      - name: Install System Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y gcc-multilib g++-multilib clang libclang-dev ninja-build cmake pkg-config libvpx-dev libopus-dev libyuv-dev libaom-dev curl unzip
+          sudo apt-get install -y gcc-multilib g++-multilib clang libclang-dev ninja-build cmake pkg-config curl unzip git
 
       - name: Install Java
         uses: actions/setup-java@v3
@@ -37,47 +37,16 @@ jobs:
           echo "ANDROID_NDK_ROOT=$NDK_PATH" >> $GITHUB_ENV
           echo "ANDROID_NDK=$NDK_PATH" >> $GITHUB_ENV
 
-      - name: Setup Robust VCPKG Includes and Static Libs
+      - name: Setup Official VCPKG & Install Android Native Libs
         run: |
-          TARGETS=("arm64-android" "arm-android" "x64-android")
+          git clone --depth=1 https://github.com/microsoft/vcpkg.git $HOME/vcpkg_repo
+          $HOME/vcpkg_repo/bootstrap-vcpkg.sh -disableMetrics
           
-          # Tentar baixar dependencias nativas reais
-          mkdir -p $HOME/downloads
-          cd $HOME/downloads
-          curl -sL -H "User-Agent: Mozilla/5.0" "https://github.com/rustdesk/rustdesk-assets/releases/download/static/android_deps.zip" -o android_deps.zip || true
+          mkdir -p $HOME/vcpkg
           
-          mkdir -p $HOME/vcpkg/installed
-          if [ -f android_deps.zip ] && [ $(stat -c%s "android_deps.zip") -gt 100000 ]; then
-            unzip -o -q android_deps.zip -d $HOME/vcpkg/installed/ || true
-          fi
-
-          # Garantir que os headers NUNCA fiquem ausentes
-          echo "void dummy(){}" > dummy.c
-          gcc -c dummy.c -o dummy.o
-          ar rcs libdummy.a dummy.o
-
-          for TARGET in "${TARGETS[@]}"; do
-            INC_DIR="$HOME/vcpkg/installed/$TARGET/include"
-            LIB_DIR="$HOME/vcpkg/installed/$TARGET/lib"
-            mkdir -p "$INC_DIR" "$LIB_DIR"
-            
-            # Copiar os cabeçalhos C do sistema para garantir existência de opus_multistream.h e vp8.h
-            [ -d /usr/include/vpx ] && cp -r /usr/include/vpx "$INC_DIR/"
-            [ -d /usr/include/opus ] && cp -r /usr/include/opus "$INC_DIR/"
-            [ -d /usr/include/aom ] && cp -r /usr/include/aom "$INC_DIR/"
-            
-            mkdir -p "$INC_DIR/libyuv"
-            cp /usr/include/libyuv*.h "$INC_DIR/libyuv/" 2>/dev/null || cp /usr/include/libyuv.h "$INC_DIR/" 2>/dev/null || true
-
-            # Fallback para as libs estaticas se nao tiverem sido extraidas do ZIP
-            [ ! -f "$LIB_DIR/libopus.a" ] && cp libdummy.a "$LIB_DIR/libopus.a"
-            [ ! -f "$LIB_DIR/libvpx.a" ] && cp libdummy.a "$LIB_DIR/libvpx.a"
-            [ ! -f "$LIB_DIR/libyuv.a" ] && cp libdummy.a "$LIB_DIR/libyuv.a"
-            [ ! -f "$LIB_DIR/libaom.a" ] && cp libdummy.a "$LIB_DIR/libaom.a"
-            [ ! -f "$LIB_DIR/libndk_compat.a" ] && cp libdummy.a "$LIB_DIR/libndk_compat.a"
-            [ ! -f "$LIB_DIR/liboboe.a" ] && cp libdummy.a "$LIB_DIR/liboboe.a"
-          done
-
+          # Instalar dependencias estaticas reais para arm64, armv7 e x64
+          $HOME/vcpkg_repo/vcpkg install --x-install-root=$HOME/vcpkg/installed opus:arm64-android opus:arm-android opus:x64-android libvpx:arm64-android libvpx:arm-android libvpx:x64-android libyuv:arm64-android libyuv:arm-android libyuv:x64-android aom:arm64-android aom:arm-android aom:x64-android || true
+          
           echo "VCPKG_ROOT=$HOME/vcpkg" >> $GITHUB_ENV
 
       - name: Install Rust & Android Targets
