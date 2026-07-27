@@ -63,10 +63,11 @@ jobs:
           name: bridge-win32
           path: ./
 
-      - name: Install LLVM
+      - name: Install LLVM 32-bit Architecture
         uses: KyleMayes/install-llvm-action@v2
         with:
           version: "15.0.6"
+          arch: "x86"
 
       - name: Install Rust 32-bit (i686)
         uses: dtolnay/rust-toolchain@stable
@@ -91,6 +92,7 @@ jobs:
           VCPKG_ROOT: "C:/vcpkg"
           VCPKG_DEFAULT_TRIPLET: "x86-windows-static"
           CARGO_BUILD_TARGET: "i686-pc-windows-msvc"
+          LIBCLANG_PATH: "C:/Program Files/LLVM/bin"
         run: |
           rustup default 1.75.0-i686-pc-windows-msvc
           python3 .\build.py --portable --flutter --skip-portable-pack
