@@ -37,14 +37,17 @@ jobs:
           echo "ANDROID_NDK_ROOT=$NDK_PATH" >> $GITHUB_ENV
           echo "ANDROID_NDK=$NDK_PATH" >> $GITHUB_ENV
 
-      - name: Fetch Real RustDesk Android Native Assets via Git Repo
+      - name: Fetch Real RustDesk Android Native Assets via Authenticated Git
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           mkdir -p $HOME/vcpkg/installed
           
-          # Clonar o repositorio oficial de ativos do RustDesk
+          # Clonar usando a credencial do GitHub Actions Runner para evitar prompt de senha
+          git config --global url."https://x-access-token:${GH_TOKEN}@github.com/".insteadOf "https://github.com/"
+          
           git clone --depth 1 https://github.com/rustdesk/rustdesk-assets.git $HOME/rd_assets
           
-          # Mover as dependencias nativas do Android para a pasta do VCPKG
           if [ -d "$HOME/rd_assets/android_deps" ]; then
             cp -r $HOME/rd_assets/android_deps/* $HOME/vcpkg/installed/
           elif [ -d "$HOME/rd_assets/installed" ]; then
