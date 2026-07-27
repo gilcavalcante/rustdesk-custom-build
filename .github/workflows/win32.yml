@@ -87,7 +87,7 @@ jobs:
         run: |
           vcpkg install --classic opus:x86-windows-static libyuv:x86-windows-static libvpx:x86-windows-static aom:x86-windows-static ffmpeg:x86-windows-static pkgconf:x86-windows-static
 
-      - name: Build Win32 Portable App via RustDesk Builder
+      - name: Build Win32 Binaries and Assemble Portable Package
         shell: pwsh
         env:
           VCPKG_ROOT: "C:/vcpkg"
@@ -97,34 +97,49 @@ jobs:
         run: |
           rustup default 1.75.0-i686-pc-windows-msvc
           
-          # Executa o build da versao portable sem falhar silenciosamente
-          python3 .\build.py --portable --flutter
+          # 1. Compilar lib nativa do Rust
+          cargo build --release --target i686-pc-windows-msvc --features "flutter"
           
+          # 2. Copiar librustdesk.dll para a pasta do Flutter
+          if (Test-Path "target/i686-pc-windows-msvc/release/librustdesk.dll") {
+            Copy-Item -Path "target/i686-pc-windows-msvc/release/librustdesk.dll" -Destination "flutter/" -Force
+          }
+
+          # 3. Compilar Flutter App
+          cd flutter
+          flutter pub get
+          flutter build windows --release
+          cd ..
+          
+          # 4. Criar pasta de saida dist_win32 limpa
           New-Item -ItemType Directory -Force -Path dist_win32
           
-          # Copia os arquivos gerados na pasta do Flutter Release
-          if (Test-Path "flutter/build/windows/runner/Release") {
-            Copy-Item -Recurse -Path ./flutter/build/windows/runner/Release/* -Destination dist_win32/ -Force
-          } elseif (Test-Path "flutter/build/windows/x86/runner/Release") {
-            Copy-Item -Recurse -Path ./flutter/build/windows/x86/runner/Release/* -Destination dist_win32/ -Force
+          # Copiar artefatos gerados pelo Flutter
+          $RELEASE_PATHS = @(
+            "flutter/build/windows/runner/Release",
+            "flutter/build/windows/x86/runner/Release",
+            "flutter/build/windows/x64/runner/Release"
+          )
+          
+          foreach ($path in $RELEASE_PATHS) {
+            if (Test-Path $path) {
+              Copy-Item -Recurse -Path "$path/*" -Destination dist_win32/ -Force
+            }
           }
           
-          # Copiar DLL e EXE compilados pelo Rust
+          # Copiar librustdesk.dll e o executavel Rust se existir
           if (Test-Path "target/i686-pc-windows-msvc/release/librustdesk.dll") { 
             Copy-Item -Path "target/i686-pc-windows-msvc/release/librustdesk.dll" -Destination dist_win32/ -Force 
           }
-          if (Test-Path "target/i686-pc-windows-msvc/release/rustdesk.exe") { 
-            Copy-Item -Path "target/i686-pc-windows-msvc/release/rustdesk.exe" -Destination dist_win32/ -Force 
-          }
           
-          # Renomear executavel principal para Sunev.exe
+          # Renomear executavel principal
           if (Test-Path "dist_win32/rustdesk.exe") { 
             Rename-Item -Path "dist_win32/rustdesk.exe" -NewName "Sunev.exe" -Force 
           } elseif (Test-Path "dist_win32/flutter_hbb.exe") {
             Rename-Item -Path "dist_win32/flutter_hbb.exe" -NewName "Sunev.exe" -Force
           }
           
-          # Remove sujeiras de build temporarias
+          # Remover sujeiras de build temporarias
           Get-ChildItem -Path dist_win32 -Include *.obj,*.lib,*.exp,*.tlog,*.recipe -Recurse | Remove-Item -Force
           
           Compress-Archive -Path dist_win32/* -DestinationPath ./Sunev-Windows-32bits-Portable.zip -Force
